@@ -54,6 +54,8 @@ def load_landmarks(a, b, names):
             x, y = np.array(a['points'][n], float), np.array(b['points'][n], float)
             P[i] = (x + y) / 2; present[i] = True
             sigma[i] = max(2.0, float(np.sqrt(((x - y) ** 2).mean() / 2)))  # per-coordinate std of two readings, floor 2 px
+    if present.sum() < 2 or len(np.unique(P[present], axis=0)) < 2:
+        raise ValueError("fitting needs at least two distinct landmarks visible in both readings")
     return P, sigma, present, a
 
 def main(p1, p2, outdir, expression=None, *, reference_image, record=None, fixture=False):
