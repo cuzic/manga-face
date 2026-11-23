@@ -23,10 +23,11 @@ class LandmarkInferenceTest(unittest.TestCase):
             Image.new("RGB", (32, 32), "white").save(image)
             record = image.with_suffix(".provenance.json")
             cell = {"position": 0, "expression": "neutral", "review": "accepted"}
-            record.write_text(json.dumps({"id": "synthetic", "review": "accepted", "cells": [cell]}))
+            record.write_text(json.dumps({"id": "synthetic", "kind": "ai-generated", "domain": "young",
+                                          "review": "accepted", "cells": [cell]}))
             manifest = root / "manifest.json"
             manifest.write_text(json.dumps({
-                "reference_id": "synthetic",
+                "reference_id": "synthetic", "kind": "ai-generated", "domain": "young",
                 "image_sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
                 "record_sha256": hashlib.sha256(record.read_bytes()).hexdigest(),
                 "cell_size": [16, 16],
@@ -46,6 +47,22 @@ class LandmarkInferenceTest(unittest.TestCase):
             destination = root / "readings"
             with patch.object(landmark_inference.subprocess, "run", side_effect=fake_call):
                 landmark_inference.run(image, manifest, destination, "test-v1", [sys.executable])
+            original = manifest.read_text()
+            for mutation in ("duplicate", "missing", "wrong domain"):
+                with self.subTest(mutation=mutation):
+                    changed = json.loads(original)
+                    if mutation == "duplicate":
+                        changed["cells"].append(changed["cells"][0])
+                    elif mutation == "missing":
+                        changed["cells"].clear()
+                    else:
+                        changed["domain"] = "mature"
+                    manifest.write_text(json.dumps(changed))
+                    with patch.object(landmark_inference.subprocess, "run") as adapter:
+                        with self.assertRaises(ValueError):
+                            landmark_inference.run(image, manifest, root / "rejected", "test-v1", [sys.executable])
+                        adapter.assert_not_called()
+                    self.assertFalse((root / "rejected").exists())
             self.assertEqual(requests[0], requests[1])
             for number in (1, 2):
                 result = json.loads((destination / f"0-pass-{number}.json").read_text())

@@ -69,6 +69,37 @@ def check_response(response, names, size, model):
     return inference_id, points, missing
 
 
+def checked_cells(record, prepared):
+    if (record["review"] != "accepted" or record["id"] != prepared["reference_id"]
+            or record["kind"] != "ai-generated" or record["domain"] not in {"young", "mature"}
+            or any(record[field] != prepared[field] for field in ("kind", "domain"))):
+        raise ValueError("the prepared reference requires matching, accepted AI provenance")
+    width, height = prepared["cell_size"]
+    expressions = ("neutral", "smile", "surprise", "angry")
+    accepted = {}
+    reviewed = set()
+    for item in record["cells"]:
+        position = item["position"]
+        if (type(position) is not int or not 0 <= position < len(expressions)
+                or position in reviewed or item["expression"] != expressions[position]
+                or item["review"] not in {"accepted", "discarded"}):
+            raise ValueError("invalid reviewed cell")
+        reviewed.add(position)
+        if item["review"] == "accepted":
+            accepted[position] = item["expression"]
+    used = set()
+    for cell in prepared["cells"]:
+        position = cell["position"]
+        if (type(position) is not int or position not in accepted or position in used
+                or cell["expression"] != accepted[position]
+                or cell["origin"] != [position % 2 * width, position // 2 * height]):
+            raise ValueError("prepared cell differs from the accepted grid")
+        used.add(position)
+    if 0 not in accepted or used != accepted.keys():
+        raise ValueError("prepared grid must include all accepted cells and an accepted neutral cell")
+    return prepared["cells"]
+
+
 def run(image_path, manifest_path, destination, model, adapter):
     prepared = json.loads(manifest_path.read_text())
     record_bytes = image_path.with_suffix(".provenance.json").read_bytes()
@@ -77,8 +108,7 @@ def run(image_path, manifest_path, destination, model, adapter):
             or hashlib.sha256(record_bytes).hexdigest() != prepared["record_sha256"]):
         raise ValueError("input image or provenance differs from the prepared manifest")
     record = json.loads(record_bytes)
-    if record["review"] != "accepted" or record["id"] != prepared["reference_id"]:
-        raise ValueError("the prepared reference requires an accepted provenance record")
+    cells = checked_cells(record, prepared)
     width, height = prepared["cell_size"]
     image = Image.open(BytesIO(image_bytes)).convert("RGB")
     if image.size != (width * 2, height * 2):
@@ -89,14 +119,9 @@ def run(image_path, manifest_path, destination, model, adapter):
     with tempfile.TemporaryDirectory(prefix="r4-inference-", dir=destination.parent) as temporary:
         location = Path(temporary) / "readings"
         location.mkdir()
-        for cell in prepared["cells"]:
+        for cell in cells:
             expression, position = cell["expression"], cell["position"]
             x, y = cell["origin"]
-            matching = [item for item in record["cells"] if item["position"] == position]
-            if (len(matching) != 1 or matching[0]["review"] != "accepted"
-                    or matching[0]["expression"] != expression
-                    or (x, y) != (position % 2 * width, position // 2 * height)):
-                raise ValueError("prepared cell differs from the accepted grid")
             definitions = {name: definition for name, definition in DEFINITIONS.items()
                            if expression == "neutral" or name not in NEUTRAL_ONLY}
             request = make_request(image.crop((x, y, x + width, y + height)), definitions, model)
