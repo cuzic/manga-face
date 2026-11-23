@@ -63,3 +63,7 @@ ADR 0002 R2 の開発者用ツール。Python の依存バージョンは `tools
 - `review_reference.py review <sheet.png> <draft.json> <reviewed.json> --id ai-0001 --reviewer owner --reviewed-at YYYY-MM-DD --decision accepted` で採用結果を記録する。判断が異なるマスは `--discard-cell 2:quality` のように指定する。シート全体を不採用にする場合は `--decision discarded --reason quality` を指定する。採用した画像と記録は非公開の置き場に保管する。
 - `reference_record.py <sheet.png> <reviewed.json> --public-row` は `PROVENANCE.md` に載せる公開用の行を生成する。`--for-fit` は中立の採否と採用マスのしきい値を追加で検査する。
 - 当てはめには `fit.py <pass1.json> <pass2.json> <outdir> --reference-image <sheet.png> --record <reviewed.json>` を使う。先に記録と座標の対応を検査し、当てはめ実行時は `fit.json` と `derived.json` に方向と来歴のハッシュを保存する。既存 PD の回帰確認は `--fixture` を付ける。数値評価の依存は ADR 0002 R5 を参照。
+
+## 採用シートを計測用に前処理する
+
+`python3 tools/fit/vectorize.py <sheet.png> <output-directory> --sheet-record <reviewed.json>` で、採用マスの墨マスクと輪郭を出力する。しきい値は来歴に記録した値を使う。生成した `manifest.json` にはマスの原点、画像・来歴の SHA-256、マスクと輪郭の SHA-256 を記録する。画像と前処理の出力は非公開の作業場所に保管する。
