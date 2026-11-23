@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {browSvg} from '../src/brows.ts';
 import {hairParts} from '../src/hair.ts';
-import {CHARACTERS, HAIR, faceFragment, normalize, prefixIds} from '../src/index.ts';
+import {CHARACTERS, HAIR, PRESETS, faceFragment, normalize, prefixIds} from '../src/index.ts';
 
 const ch = (skin: string, hair: string) => ({...CHARACTERS.a, palette: {...CHARACTERS.a.palette, skin, hair}});
 const paths = (svg: string, color: string, width: number) => Array.from(svg.matchAll(
@@ -55,16 +55,31 @@ test('brows reject angles outside the trig table', () => {
   }
 });
 
-test('two faces in one SVG reference only their own clip paths', () => {
-  const faces = [ch('dark', 'black'), CHARACTERS.b].map((character, i) =>
-    prefixIds(faceFragment(character, 'think').fragment, `face-${i}-`));
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg">${faces.join('')}</svg>`;
-  const ids = Array.from(svg.matchAll(/<clipPath id="([^"]+)"/g), match => match[1]!);
-  assert.equal(new Set(ids).size, ids.length);
-  faces.forEach((fragment, i) => {
-    const ownIds = new Set(ids.filter(id => id.startsWith(`face-${i}-`)));
-    assert.ok(ownIds.has(`face-${i}-bk`));
-    const refs = Array.from(fragment.matchAll(/clip-path="url\(#([^)]+)\)"/g), match => match[1]);
-    assert.deepEqual(new Set(refs), ownIds);
-  });
+const ids = (fragment: string) => Array.from(fragment.matchAll(/\bid="([^"]+)"/g), match => match[1]!);
+const refs = (fragment: string) => Array.from(fragment.matchAll(/url\(#([^)]+)\)|\bhref="#([^"]+)"/g),
+  match => (match[1] ?? match[2])!);
+
+test('two faces per expression in one SVG reference only their own IDs', () => {
+  const faces = Object.keys(PRESETS).flatMap(expression => [ch('dark', 'black'), CHARACTERS.b].map((character, i) => {
+    const prefix = `${expression}-${i}-`;
+    return {prefix, fragment: prefixIds(faceFragment(character, expression).fragment, prefix)};
+  }));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg">${faces.map(({fragment}) => fragment).join('')}</svg>`;
+  const allIds = ids(svg);
+  assert.equal(new Set(allIds).size, allIds.length);
+  for (const {prefix, fragment} of faces) {
+    const ownIds = new Set(ids(fragment));
+    assert.ok(ownIds.has(`${prefix}bk`), prefix);
+    assert.deepEqual(new Set(refs(fragment)), ownIds, prefix);
+  }
+});
+
+test('prefixIds keeps mask, paint and href references local to each copy', () => {
+  const source = '<defs><mask id="m"><rect width="8" height="8" fill="#fff"/></mask>'
+    + '<linearGradient id="p"><stop offset="0" stop-color="#000"/></linearGradient>'
+    + '<path id="shape" d="M0 0H8V8Z"/></defs><use href="#shape" fill="url(#p)" mask="url(#m)"/>';
+  const copies = ['left-', 'right-'].map(prefix => prefixIds(source, prefix));
+  const allIds = ids(copies.join(''));
+  assert.equal(new Set(allIds).size, 6);
+  for (const copy of copies) assert.deepEqual(new Set(refs(copy)), new Set(ids(copy)));
 });

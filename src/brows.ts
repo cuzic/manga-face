@@ -12,8 +12,9 @@ export function browKeyline(d: string, width = BROW_STROKE + KEY_W): string {
 }
 
 export function browSvg(bp: Preset['brow'], thick: number, s: -1 | 1, ex: number, ey: number, eyeH: number, dy0: number): {path: string; built: Built} {
-  const trig = TRIG[Math.round(bp.angle) + 45];
-  if (!trig || bp.angle < -45 || bp.angle > 45) {
+  const {angle} = bp;
+  const trig = angle >= -45 && angle <= 45 ? TRIG[Math.round(angle) + 45] : undefined;
+  if (!trig) {
     throw new RangeError(`Brow angle ${bp.angle} is outside the supported range. Use an angle between -45 and 45 degrees.`);
   }
   const len = 36, raise = bp.raise ? (s === 1 ? bp.raise[1] : bp.raise[0]) : 0;

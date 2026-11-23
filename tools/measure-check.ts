@@ -9,6 +9,7 @@ export type Distribution = Record<'showcase' | 'random' | 'extremes', readonly P
 
 export const FEATURE_MIN_FRACTION = 0.85;
 export const KEYLINE_MIN_PIXELS = 100;
+const FEATURE_GRID_CASES = 1512;
 
 export const median = (sorted: readonly number[]): number => {
   const middle = Math.floor(sorted.length / 2);
@@ -55,6 +56,7 @@ export function judge({showcase, random, extremes}: Distribution) {
 interface FeaturePixels {
   worst: {id: string; fraction: number};
   totalFraction: number;
+  cases: number;
 }
 
 export function judgePixels(features: FeaturePixels, control: FeaturePixels,
@@ -62,12 +64,13 @@ export function judgePixels(features: FeaturePixels, control: FeaturePixels,
   const passesContrast = ({worst, totalFraction}: FeaturePixels) =>
     worst.fraction >= FEATURE_MIN_FRACTION && totalFraction >= 0.95;
   const percent = (value: number) => `${(100 * value).toFixed(2)}%`;
-  const displayPixels = ({worst, totalFraction}: FeaturePixels) =>
-    `${percent(worst.fraction)} (${worst.id}), total ${percent(totalFraction)}`;
+  const displayPixels = ({worst, totalFraction, cases}: FeaturePixels) =>
+    `${percent(worst.fraction)} (${worst.id}), total ${percent(totalFraction)}, ${cases}/${FEATURE_GRID_CASES} cases`;
 
   return [
     {criterion: '⑤ Feature lines ≥ 85% each and ≥ 95% overall, control fails',
-      pass: passesContrast(features) && !passesContrast(control),
+      pass: features.cases === FEATURE_GRID_CASES && control.cases === FEATURE_GRID_CASES
+        && passesContrast(features) && !passesContrast(control),
       value: `${displayPixels(features)}; control: ${displayPixels(control)}`},
     {criterion: '⑥ Boundary keylines change ≥ 100 px each',
       pass: [...hairFace, ...faceNeck].every(pixels => pixels >= KEYLINE_MIN_PIXELS),
