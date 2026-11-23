@@ -10,7 +10,7 @@ import type {Violation} from './validate.ts';
 // group by group (eyes, brows, mouth, head, hair) from `field#k` sub-streams, then from the young direction's defaults; the other groups keep their values.
 const xmur3 = (str: string): number => { let h = 1779033703 ^ str.length; for (let i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); } h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return (h ^= h >>> 16) >>> 0; };
 const mulberry32 = (a: number): number => { let t = (a + 0x6d2b79f5) | 0; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-/** Bumped whenever the ranges, the dependent constraints, the sampler, `validate` or a preset changes. A seed is stable only within one generator version. */
+/** A seed is stable within one generator version (ADR 0001 D5). */
 export const GENERATOR = 2;
 type Group = Exclude<Violation['group'], 'palette'>;
 const GROUPS: readonly Group[] = ['head', 'eyes', 'brows', 'mouth', 'hair'];
@@ -39,13 +39,33 @@ export function randomCharacterDetailed(seed: string | number, id = `mf-${seed}`
   // biome-ignore lint/style/noNonNullAssertion: The draw is in [0, 1), so the nose index is 0, 1 or 2.
   let ch = {id, name: s, nose: (['none', 'dot', 'line'] as const)[Math.floor(u('nose') * 3)]!, palette: {skin: choose('skin', SKIN), hair: choose('hairc', HAIR), top: choose('top', TOP), iris: choose('iris', IRIS)}} as Character;
   for (const g of GROUPS) ch = {...ch, ...drawGroup(s, g, 0, ch)} as Character;
-  ch = normalize(ch);
-  const first = validate(ch).length === 0;
+  return repairCharacter(ch, s);
+}
+
+/** Repairs an initial draw, preserving the other groups subject to normalization. */
+export function repairCharacter(candidate: Character, seed: string): Drawn {
+  let ch = normalize(candidate);
+  let violations = validate(ch);
+  const firstDrawValid = violations.length === 0;
   const repaired: Group[] = [];
-  for (let k = 1; k <= 4 && validate(ch).length > 0; k++) {
-    for (const g of repairGroups(validate(ch))) { ch = normalize({...ch, ...drawGroup(s, g, k, ch)} as Character); repaired.push(g); }
+  for (let k = 1; k <= 4 && violations.length > 0; k++) {
+    for (const group of repairGroups(violations)) {
+      ch = normalize({...ch, ...drawGroup(seed, group, k, ch)});
+      repaired.push(group);
+    }
+    violations = validate(ch);
   }
-  for (const g of repairGroups(validate(ch))) { ch = normalize({...ch, ...(g === 'hair' ? {hair: {...HAIR_YOUNG}} : {[g]: DIRECTIONS.young[g as 'head' | 'eyes' | 'brows' | 'mouth']})} as Character); repaired.push(g); }
-  return {character: ch, firstDrawValid: first, repaired};
+  if (violations.length > 0) {
+    for (const group of repairGroups(violations)) {
+      const fallback = group === 'hair' ? HAIR_YOUNG : DIRECTIONS.young[group];
+      ch = normalize({...ch, [group]: fallback});
+      repaired.push(group);
+    }
+    const remaining = validate(ch);
+    if (remaining.length > 0) {
+      throw new Error(`manga-face: generated character ${ch.id} failed validation after repair: ${remaining.map(v => v.message).join('; ')}. Report seed ${JSON.stringify(seed)}.`);
+    }
+  }
+  return {character: ch, firstDrawValid, repaired};
 }
 export const randomCharacter = (seed: string | number, id?: string): Character => randomCharacterDetailed(seed, id).character;
