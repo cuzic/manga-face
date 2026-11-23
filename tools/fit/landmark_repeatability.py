@@ -1,8 +1,9 @@
 """Report ADR 0002 D8 landmark repeatability from five paired neutral readings.
 
-Usage: python3 landmark-repeatability.py sessions.json
-The manifest is an array of five objects. Each has `face_width_px`,
-`prepared_manifest`, and `first`/`second` objects with `file`.
+Usage: python3 landmark_repeatability.py sessions.json
+The manifest is an array of five objects, each with `prepared_manifest` and
+`first`/`second` objects with `file`. Optional `face_width_px` overrides the
+default mean width measured between the two cheek landmarks.
 Paths are relative to the manifest. Each point file identifies its model version,
 prompt SHA-256, and distinct inference ID.
 """
@@ -34,6 +35,25 @@ def read_pass(session, directory, expected):
                 or not (0 <= point[0] < width and 0 <= point[1] < height)):
             raise ValueError(f"invalid coordinate: {session['file']}")
     return data
+
+
+def face_width(session, readings, reference):
+    width = session.get("face_width_px")
+    if "face_width_px" not in session:
+        spans = []
+        for reading in readings:
+            points = reading["points"]
+            if not {"cheekL", "cheekR"} <= points.keys():
+                raise ValueError(f"face width unavailable because a cheek is missing: {reference}")
+            span = points["cheekR"][0] - points["cheekL"][0]
+            if span <= 0:
+                raise ValueError(f"cheek coordinates are reversed or coincide: {reference}")
+            spans.append(span)
+        width = mean(spans)
+    if not isinstance(width, (int, float)) or isinstance(width, bool) or not 0 < width <= readings[0]["size"][0]:
+        raise ValueError(f"invalid face width: {reference}")
+    return width
+
 
 
 def measure(manifest):
@@ -73,9 +93,7 @@ def measure(manifest):
         if reference in reference_ids:
             raise ValueError("expected five distinct reference sheets")
         reference_ids.add(reference)
-        width = session["face_width_px"]
-        if not isinstance(width, (int, float)) or isinstance(width, bool) or not 0 < width <= a["size"][0]:
-            raise ValueError(f"invalid face width: {reference}")
+        width = face_width(session, (a, b), reference)
         for name in a["points"].keys() & b["points"].keys():
             difference_squared = math.dist(a["points"][name], b["points"][name]) ** 2 / 4
             samples[name].append((difference_squared, width))

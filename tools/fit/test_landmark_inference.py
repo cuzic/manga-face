@@ -168,3 +168,16 @@ class CalibrationSummaryTest(unittest.TestCase):
                         self.fail("acquired an occupied calibration lock")
             with run_landmark_calibration.calibration_lock(output):
                 self.assertFalse(output.exists())
+
+
+class RepeatabilityWidthTest(unittest.TestCase):
+    def test_face_width_uses_the_two_measured_cheek_spans(self):
+        from landmark_repeatability import face_width
+
+        a = {"size": [408, 408], "points": {"cheekL": [90, 140], "cheekR": [280, 140]}}
+        b = {"size": [408, 408], "points": {"cheekL": [83, 141], "cheekR": [283, 141]}}
+        self.assertEqual(face_width({}, (a, b), "fixture"), 195)
+        del b["points"]["cheekL"]
+        with self.assertRaisesRegex(ValueError, "cheek is missing"):
+            face_width({}, (a, b), "fixture")
+        self.assertEqual(face_width({"face_width_px": 194}, (a, b), "fixture"), 194)
