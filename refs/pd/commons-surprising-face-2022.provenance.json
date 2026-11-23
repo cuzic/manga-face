@@ -14,6 +14,8 @@
   "kind": "reference-pd-cc0",
   "used_for": "fit and eval (spike of docs/adr/0002). NOT for hair shipping (ADR 0002 D6: tier B sources need the second check and a person's resemblance review first, and a parametric redraw is preferred over shipping curves).",
   "ai_generated": false,
-  "review": "a person (this PR's author, a language model reading the image) looked at it: a generic surprised face, not a real person, not a known character. A human reviewer (owner) must confirm before it is used for anything beyond this spike.",
-  "replaces": "an earlier spike reference (Open Clip Art 'Manga Boy'), removed because its Commons description says it depicts a real person (the author)"
+  "review": "NOT yet confirmed by a person. A language model (this PR's author) looked at the image: a generic surprised face, not a real person, not a known character. The landmarks were also read by a language model. The owner must confirm (ADR 0002 Q10) before PR #8 is merged: not a real person or known character; domain out.",
+  "replaces": "an earlier spike reference (Open Clip Art 'Manga Boy'), removed because its Commons description says it depicts a real person (the author)",
+  "domain": "out (proposed: a gag/chibi-proportioned sketch; the owner sets it, ADR 0002 D2 and Q10)",
+  "reviewer": "pending (owner)"
 }
