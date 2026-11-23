@@ -57,6 +57,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Playwright Chromium 1.62.1 pins Chromium 151.0.7922.34. Re-run the D7 measurements on upgrades:
+      # the showcase minimum is 6.055 against a floor of 6.
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm measure --check
       - uses: actions/upload-artifact@v4
@@ -64,10 +66,16 @@ jobs:
         with:
           name: measurements
           path: out/measurements.json
-      - name: generate stage gallery and blind check
+      - run: node tools/stage.ts
+      - name: generate blind quiz with the organizer's seed
+        id: blind
+        env:
+          BLIND_QUIZ_SEED: ${{ secrets.BLIND_QUIZ_SEED }}
         run: |
-          node tools/stage.ts
-          node tools/blind.ts
+          if [[ -n "$BLIND_QUIZ_SEED" ]]; then
+            node tools/blind.ts "$BLIND_QUIZ_SEED"
+            echo "generated=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: render before and after brow crops
         if: github.event_name == 'pull_request'
         env:
@@ -84,5 +92,10 @@ jobs:
           name: stage-review
           path: |
             out/stage.svg
-            out/blind.html
             out/brows-*.png
+      - uses: actions/upload-artifact@v4
+        if: steps.blind.outputs.generated == 'true'
+        with:
+          name: blind-quiz
+          path: out/blind.html
+          if-no-files-found: error

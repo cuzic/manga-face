@@ -1,4 +1,6 @@
-// node tools/blind.ts [outdir] — run pnpm measure --check first, then open blind.html at 100% zoom.
+// node tools/blind.ts <seed> [outdir] — run pnpm measure --check first, then open blind.html at 100% zoom.
+// Reviewers should download only blind-quiz from CI. Keep blind-key.json with the organizer, who loads it after the answers are in.
+import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -7,11 +9,10 @@ import type {Character} from '../src/index.ts';
 import {stageCell} from './stage.ts';
 import {OUT, reviewCases} from './stage-cases.ts';
 
-const SEED = 2075;
 const PASS_SCORE = 7;
 
-export function blind(rows: readonly {id: string; ch: Character}[]) {
-  let state = SEED;
+export function blind(rows: readonly {id: string; ch: Character}[], seed: number) {
+  let state = seed;
   const targets = rows.map(({id, ch}, row) => {
     const order = ADR0074.map(() => {
       state = (Math.imul(1664525, state) + 1013904223) >>> 0;
@@ -20,9 +21,10 @@ export function blind(rows: readonly {id: string; ch: Character}[]) {
     const cards = order.map((expression, i) => stageCell(ch, expression, `q${row}-${i}`));
     return {id, order, cards};
   });
-  const key = {seed: SEED, targets: targets.map(({id, order}) => ({id, order}))};
   // Script data holds the anonymous SVG cards in display order. Only the separate key has the expression labels.
   const cards = JSON.stringify(targets.map(target => target.cards)).replaceAll('<', '\\u003c');
+  const quizId = createHash('sha256').update(cards).digest('hex');
+  const key = {seed, quizId, targets: targets.map(({id, order}) => ({id, order}))};
   const html = `<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
@@ -85,7 +87,7 @@ export function blind(rows: readonly {id: string; ch: Character}[]) {
     results.replaceChildren();
     try {
       const key = JSON.parse(await file.text());
-      if (key.seed !== ${SEED} || key.targets.length !== cards.length) throw new Error();
+      if (key.quizId !== ${JSON.stringify(quizId)} || key.targets.length !== cards.length) throw new Error();
       const list = document.createElement('ul');
       key.targets.forEach(({id, order}, i) => {
         if (typeof id !== 'string' || !Array.isArray(order) || order.length !== names.length
@@ -108,9 +110,14 @@ export function blind(rows: readonly {id: string; ch: Character}[]) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const dir = process.argv[2] ?? OUT;
+  const [, , seedArg, dir = OUT] = process.argv;
+  const seed = Number(seedArg);
+  if (!seedArg || !/^\d+$/.test(seedArg) || seed > 0xffffffff) {
+    console.error('Choose a seed for this quiz. Run node tools/blind.ts <seed> [outdir] with an integer from 0 to 4294967295.');
+    process.exit(1);
+  }
   const {showcase, worst} = reviewCases(dir);
-  const {html, key} = blind([showcase[0]!, showcase[1]!, showcase[3]!, ...worst]);
+  const {html, key} = blind([showcase[0]!, showcase[1]!, showcase[3]!, ...worst], seed);
   fs.writeFileSync(path.join(dir, 'blind.html'), html);
   fs.writeFileSync(path.join(dir, 'blind-key.json'), `${JSON.stringify(key, null, 2)}\n`);
 }
