@@ -1,0 +1,6 @@
+allowBuilds:
+  esbuild: false
+  playwright-chromium: true
+  svg-diagram: true
+onlyBuiltDependencies:
+  - playwright-chromium

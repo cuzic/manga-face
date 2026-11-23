@@ -1,0 +1,67 @@
+name: test
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    name: test (node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # the same bytes must come out on every Node (the generator is pure; ADR 0001 D5)
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      # the version is package.json's packageManager
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+  # The goldens (goldens/*.svg) are rebuilt and compared byte for byte. Faces have no text, so no fonts are involved: plain SVG is the same on every machine.
+  # The whole gallery is rendered too and kept as an artifact, so a reviewer can look at it.
+  golden:
+    name: golden (goldens)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: the goldens match a rebuild
+        run: pnpm golden
+      - name: render the gallery
+        run: pnpm gallery
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gallery
+          path: out/*.svg
+  # The measurements (determinism in Chromium, anchors by raster, distinguishability at stage scale, the pixel checks) need a browser. Not a required check
+  # while the thresholds are being settled; its numbers are in the artifact.
+  measure:
+    name: measure (chromium)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm measure
+      - uses: actions/upload-artifact@v4
+        with:
+          name: measurements
+          path: out/measurements.json

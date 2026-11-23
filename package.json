@@ -1,0 +1,46 @@
+{
+  "name": "manga-face",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Parametric manga-style faces as SVG (CharacterManifest for svg-diagram).",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cuzic/manga-face.git"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "packageManager": "pnpm@11.2.2",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md",
+    "PROVENANCE.md"
+  ],
+  "scripts": {
+    "test": "node --test \"test/*.test.ts\"",
+    "typecheck": "tsc -p .",
+    "lint": "biome lint .",
+    "golden": "node tools/golden.ts",
+    "golden:write": "node tools/golden.ts --write",
+    "gallery": "node tools/gallery.ts && node tools/directions.ts",
+    "measure": "node tools/measure.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/node": "^26.6.6",
+    "esbuild": "0.21.5",
+    "playwright-chromium": "1.62.1",
+    "svg-diagram": "github:cuzic/svg-diagram#748165241dabf3d16bc685496a0870e5ff14cb37",
+    "typescript": "^7.0.2"
+  }
+}
