@@ -50,6 +50,43 @@ def validate(image, raw_record, fixture=False, for_fit=False):
     }
 
 
+def fit_inputs(image, record_path, passes, fixture=False):
+    """Validate the recorded reference and the bindings of its two landmark passes."""
+    from PIL import Image
+
+    record_path = record_path or image.with_suffix(".provenance.json")
+    raw_record = record_path.read_bytes()
+    identity = validate(image, raw_record, fixture=fixture, for_fit=True)
+    record = json.loads(raw_record)
+    a, b = (json.loads(path.read_text()) for path in passes)
+    with Image.open(image) as picture:
+        width, height = picture.size
+    if identity["kind"] == "ai-generated":
+        if width % 2 or height % 2:
+            raise ValueError("generated sheet must divide into a 2×2 grid")
+        position = a["position"]
+        cell = next((cell for cell in record["cells"] if cell["position"] == position), None)
+        if cell is None or cell["review"] != "accepted":
+            raise ValueError("landmark readings need an accepted cell")
+        w, h = width // 2, height // 2
+        expected = {
+            **{key: identity[key] for key in ("reference_id", "image_sha256", "record_sha256")},
+            "position": position, "size": [w, h],
+            "origin": [position % 2 * w, position // 2 * h], "expression": cell["expression"],
+        }
+        for number, reading in enumerate((a, b), 1):
+            if reading.get("pass") != number or any(reading.get(key) != value for key, value in expected.items()):
+                raise ValueError(f"landmark pass {number} does not match the accepted grid and provenance")
+        if not a.get("inference_id") or not b.get("inference_id") or a["inference_id"] == b["inference_id"]:
+            raise ValueError("landmark passes need distinct inference IDs")
+    elif any(reading.get("size") != [width, height] for reading in (a, b)) or a.get("expression") != b.get("expression"):
+        raise ValueError("PD landmark passes disagree about image size or expression")
+    if any(reading.get("image") != image.name for reading in (a, b)):
+        raise ValueError("landmark pass image name differs from the reference image")
+    return identity, a, b
+
+
+
 def public_row(data, identity):
     """Format the allowlisted fields of an accepted generated reference."""
     if identity["kind"] != "ai-generated":

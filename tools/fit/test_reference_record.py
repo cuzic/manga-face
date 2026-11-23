@@ -59,3 +59,26 @@ class ReferenceRecordTest(unittest.TestCase):
             reference_record.validate(image, metadata)
         result = reference_record.validate(image, metadata, fixture=True)
         self.assertEqual((result["kind"], result["domain"]), ("pd-cc0", "out"))
+
+    def test_fit_binds_landmark_passes_to_the_approved_cell(self):
+        from PIL import Image
+
+        Image.new("RGB", (32, 32), "white").save(self.image)
+        self.data["sha256"] = hashlib.sha256(self.image.read_bytes()).hexdigest()
+        record = self.image.with_suffix(".provenance.json")
+        record.write_text(json.dumps(self.data))
+        identity = self.validate(self.data, for_fit=True)
+        first = self.image.with_name("first.json")
+        second = self.image.with_name("second.json")
+        shared = {**identity, "image": self.image.name, "size": [16, 16], "position": 0,
+                  "origin": [0, 0], "expression": "neutral", "points": {}}
+        first.write_text(json.dumps({**shared, "pass": 1, "inference_id": "one"}))
+        second_record = {**shared, "pass": 2, "inference_id": "two"}
+        second.write_text(json.dumps(second_record))
+        result, _, _ = reference_record.fit_inputs(self.image, None, (first, second))
+        self.assertEqual(result, identity)
+        for key, value in [("record_sha256", "0" * 64), ("origin", [16, 0]), ("inference_id", "one")]:
+            with self.subTest(key=key):
+                second.write_text(json.dumps({**second_record, key: value}))
+                with self.assertRaises(ValueError):
+                    reference_record.fit_inputs(self.image, None, (first, second))

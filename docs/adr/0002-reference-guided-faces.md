@@ -289,7 +289,7 @@ owner が決めた方向(2026-11-23):
 python3 -m venv .venv && .venv/bin/pip install -r tools/fit/requirements.txt
 R=refs/pd/commons-surprising-face-2022
 .venv/bin/python tools/fit/vectorize.py $R.png out/fit 140
-.venv/bin/python tools/fit/fit.py $R.landmarks.pass1.json $R.landmarks.pass2.json out/fit
+.venv/bin/python tools/fit/fit.py $R.landmarks.pass1.json $R.landmarks.pass2.json out/fit --reference-image $R.png --fixture
 .venv/bin/python tools/fit/compare.py $R.png $R.landmarks.pass1.json $R.landmarks.pass2.json out/fit   # needs playwright-chromium's browser
 ```
 
