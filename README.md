@@ -17,6 +17,10 @@ const manifest = toManifest(defaultCharacter({style: 'young', palette: {skin: 'm
 // comic(sheet, {characters: {[manifest.id]: manifest}})
 ```
 
+`validate(character)` returns an array of violations with a `group`, a `code`, a human-readable `message`, and an `expression` when the check applies to a specific expression. An empty array means the character is valid. Validation checks numeric fields, strand counts, and palette values on the input, then checks geometry after normalization. Numeric fields must be finite numbers, and range bounds allow floating-point error up to `1e-9`. `toManifest(character)` throws with the violation messages if validation fails.
+
+`validateRaw(character, expressions?)` checks the supplied geometry directly, without normalization or range, strand-count, and palette validation. It checks the eight comic expressions by default.
+
 ## Development
 
 ```sh

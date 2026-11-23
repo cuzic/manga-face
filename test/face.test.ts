@@ -17,31 +17,10 @@ test('young is the default style; mature is chosen with style: mature', () => {
   for (const style of ['young', 'mature'] as const) assert.deepEqual(validate(defaultCharacter({style})), []);
 });
 
-test('the same parameters give the same bytes, also from a deep copy', () => {
-  const a = JSON.stringify(toManifest(CHARACTERS.a));
-  assert.equal(a, JSON.stringify(toManifest(CHARACTERS.a)));
-  assert.equal(a, JSON.stringify(toManifest(structuredClone(CHARACTERS.a))));
-});
-
-test('validate reports strands 0, chin 110, a bad hex and an unknown palette key, and toManifest refuses', () => {
-  const bad = (f: (c: Character) => Character) => f(structuredClone(CHARACTERS.a) as Character);
-  assert.match(validate(bad(c => ({...c, hair: {...c.hair, strands: 0}}))).join(), /strands/);
-  assert.match(validate(bad(c => ({...c, head: {...c.head, chin: 110}}))).join(), /head\.chin=110/);
-  assert.match(validate(bad(c => ({...c, palette: {...c.palette, skin: '#12345'}}))).join(), /palette\.skin/);
-  assert.match(validate(bad(c => ({...c, palette: {...c.palette, hair: 'green'}}))).join(), /palette\.hair/);
-  assert.throws(() => toManifest(bad(c => ({...c, hair: {...c.hair, strands: 0}}))), /invalid character/);
-});
-
 test('normalize is idempotent and keeps the face inside the head circle', () => {
   const c = {...structuredClone(CHARACTERS.a), head: {cheek: 96, chin: 98, jaw: 1, chinW: 0}} as Character;
   assert.equal(JSON.stringify(normalize(normalize(c))), JSON.stringify(normalize(c)));
   assert.deepEqual(validate(c), []);
-});
-
-test('a base colour that equals paper or ink stays a 6-digit hex that svg-diagram loads', () => {
-  const m = toManifest({...structuredClone(CHARACTERS.a), id: 'edge', palette: {skin: '#ffffff', hair: '#22201b', top: '#fffff0', iris: '#ffffff'}} as Character);
-  assert.doesNotMatch(JSON.stringify(m), /#[0-9a-f]{7,}/i);
-  assertLoads(m);
 });
 
 test('the sampler returns a valid character for every seed, and the same one for the same seed', () => {

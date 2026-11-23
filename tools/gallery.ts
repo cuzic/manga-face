@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {prefixIds} from '../src/ids.ts';
-import {ADR0074, BOX, CHARACTERS, faceFragment, type Character} from '../src/face.ts';
+import {ADR0074, BOX, CHARACTERS, faceFragment, type Character} from '../src/index.ts';
 
 const SKINS = {light: 'light', brown: 'brown'};
 const base = (hair: 'short' | 'bob', skin: string): Character => {

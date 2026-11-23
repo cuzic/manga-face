@@ -11,7 +11,8 @@ test('src/ is pure: no node:* import, no fs / process / Date / Math.random, no M
   for (const f of files) {
     const text = fs.readFileSync(path.join(src, f), 'utf8').replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
     assert.doesNotMatch(text, /from\s+['"]node:/, `${f}: node:* import`);
-    assert.doesNotMatch(text, /\b(require|process\.|Date\.now|new Date|Math\.random)\b/, `${f}: impure call`);
+    assert.doesNotMatch(text, /\b(require|process\.|Date|Math\.random)\b/, `${f}: impure call`);
+    assert.doesNotMatch(text, /\b(?:Intl|toLocale\w*|toFixed)\b/, `${f}: engine-dependent formatting`);
     assert.doesNotMatch(text, /Math\.(cos|sin|tan|pow|hypot|exp|log|atan2?)\b|\*\*/, `${f}: engine-dependent maths`);
   }
 });

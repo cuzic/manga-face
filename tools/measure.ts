@@ -7,7 +7,7 @@ import {execFileSync} from 'node:child_process';
 import {comic, diagram, renderInBrowser} from 'svg-diagram/browser';
 import type {ComicWorksheet} from 'svg-diagram';
 import {assertLoads} from './conformance.ts';
-import {ADR0074, BOX, CHARACTERS, HAIR, INK, KEY_BELOW, SCALE, SKIN, GENERATOR, contrast, faceFragment, needsKeyline, normalize, randomCharacter, randomCharacterDetailed, toManifest, validate, RANGES, type Character} from '../src/face.ts';
+import {ADR0074, BOX, CHARACTERS, HAIR, INK, KEY_BELOW, SCALE, SKIN, GENERATOR, contrast, faceFragment, needsKeyline, normalize, randomCharacter, randomCharacterDetailed, toManifest, validate, RANGES, type Character} from '../src/index.ts';
 import {sheet} from './gallery.ts';
 
 const dir = process.argv[2] ?? path.join(import.meta.dirname, '../out');
@@ -149,12 +149,14 @@ stat['seedSnapshot'] = Object.fromEntries([0, 1, 2].map(i => { const c = randomC
 let gridN = 0, gridBad = 0; const gridWhy: Record<string, number> = {};
 for (const cheek of [74, 80, 86, 92, 96]) for (const chin of [90, 94, 98]) for (const strands of [1, 5, 9]) for (const parting of [-1, 0, 1]) for (const template of ['short', 'bob'] as const) for (const dirn of ['a', 'm'] as const) {
   const c = {...structuredClone(CHARACTERS[dirn]), mirror: false, head: {...CHARACTERS[dirn].head, cheek, chin}, hair: {...CHARACTERS[dirn].hair, strands, parting, template}} as Character;
-  gridN++; const bad = validate(c); if (bad.length) { gridBad++; for (const x of new Set(bad.map(v => v.replace(/^[a-z]+: /, '').replace(/[-0-9.]+/g, '#').slice(0, 45)))) gridWhy[x] = (gridWhy[x] ?? 0) + 1; }
+  gridN++; const bad = validate(c); if (bad.length) { gridBad++; for (const x of new Set(bad.map(v => v.message.replace(/^[a-z]+: /, '').replace(/[-0-9.]+/g, '#').slice(0, 45)))) gridWhy[x] = (gridWhy[x] ?? 0) + 1; }
 }
 stat['coarseGrid'] = {points: gridN, invalid: gridBad, rate: `${(gridBad / gridN * 100).toFixed(1)}%`, why: gridWhy};
-const bad0 = validate({...CHARACTERS.a, hair: {...CHARACTERS.a.hair, strands: 0}} as Character);
-stat['invalidInputs'] = {strands0: bad0, chin110: validate({...CHARACTERS.a, head: {...CHARACTERS.a.head, chin: 110}} as Character),
-  badHex: validate({...CHARACTERS.a, palette: {...CHARACTERS.a.palette, skin: '#12345'}} as Character), unknownKey: validate({...CHARACTERS.a, palette: {...CHARACTERS.a.palette, hair: 'green'}} as Character)};
+const invalidMessages = (character: Character): string[] => validate(character).map(violation => violation.message);
+stat['invalidInputs'] = {strands0: invalidMessages({...CHARACTERS.a, hair: {...CHARACTERS.a.hair, strands: 0}}),
+  chin110: invalidMessages({...CHARACTERS.a, head: {...CHARACTERS.a.head, chin: 110}}),
+  badHex: invalidMessages({...CHARACTERS.a, palette: {...CHARACTERS.a.palette, skin: '#12345'}}),
+  unknownKey: invalidMessages({...CHARACTERS.a, palette: {...CHARACTERS.a.palette, hair: 'green'}})};
 let threw = false; try { toManifest({...CHARACTERS.a, hair: {...CHARACTERS.a.hair, strands: 0}} as Character); } catch { threw = true; }
 stat['toManifestThrowsOnInvalid'] = threw;
 // a palette hex that equals paper or ink is moved by one unit and stays a 6-digit hex that loadCharacter accepts (the bug was #1000000)
