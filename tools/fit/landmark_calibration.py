@@ -88,6 +88,26 @@ def score(truth, prediction):
     }
 
 
+def summarize(scores):
+    """Aggregate accuracy without counting an occlusion as a missed visible point."""
+    summary = {}
+    for name in POINTS:
+        errors = [score["error_px"][name] for score in scores if name in score["error_px"]]
+        missed = sum(name in score["missed_visible"] for score in scores)
+        false_positives = sum(name in score["false_positive_on_occluded"] for score in scores)
+        visible = len(errors) + missed
+        summary[name] = {
+            "visible_readings": visible,
+            "detected_visible": len(errors),
+            "detection_rate": len(errors) / visible if visible else None,
+            "occluded_readings": len(scores) - visible,
+            "false_positive_on_occluded": false_positives,
+            "rms_px": math.sqrt(mean(error ** 2 for error in errors)) if errors else None,
+            "max_px": max(errors, default=None),
+        }
+    return summary
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)

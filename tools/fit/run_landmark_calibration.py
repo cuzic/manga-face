@@ -73,7 +73,10 @@ def evaluate(fixtures, model, adapter, checkpoint, cases=calibration.BASE_CASES)
                 **identity, "inference_id": response_id, "prediction": prediction,
                 "metrics": calibration.score(truth, prediction),
             })
-    return {"model_version": model, "readings": scores}
+    return {
+        "model_version": model, "readings": scores,
+        "landmark_summary": calibration.summarize([reading["metrics"] for reading in scores]),
+    }
 
 
 if __name__ == "__main__":

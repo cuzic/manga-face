@@ -129,3 +129,19 @@ class SheetLayoutTest(unittest.TestCase):
         cells[1]["expression"] = "smile"
         with self.assertRaisesRegex(ValueError, "R1 expression sheet"):
             landmark_inference.checked_cells(record, prepared)
+
+
+class CalibrationSummaryTest(unittest.TestCase):
+    def test_visible_and_occluded_cases_have_separate_counts(self):
+        scores = [
+            {"error_px": {"chin": 3, "browL": 2}, "missed_visible": [], "false_positive_on_occluded": []},
+            {"error_px": {"chin": 4}, "missed_visible": ["browL"], "false_positive_on_occluded": []},
+            {"error_px": {"chin": 0}, "missed_visible": [], "false_positive_on_occluded": ["browL"]},
+        ]
+        summary = landmark_calibration.summarize(scores)
+        brow = summary["browL"]
+        self.assertEqual((brow["visible_readings"], brow["detected_visible"], brow["detection_rate"]), (2, 1, 0.5))
+        self.assertEqual((brow["occluded_readings"], brow["false_positive_on_occluded"]), (1, 1))
+        self.assertEqual(brow["rms_px"], 2)
+        self.assertEqual(summary["chin"]["max_px"], 4)
+        self.assertAlmostEqual(summary["chin"]["rms_px"], (25 / 3) ** 0.5)
