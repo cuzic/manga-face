@@ -112,7 +112,7 @@ def main(task, key):
     except (KeyError, TypeError, ValueError):
         result = {"error": "saved API response did not meet the reading contract",
                   "inference_id": raw.get("id"), "usage": token_usage(raw)}
-    configuration = request_body({**task, "image_png_base64": ""})
+    configuration = request_body({**task, "image_png_base64": "", "size": [0, 0]})
     result["sent_request_sha256"] = hashlib.sha256(wire).hexdigest()
     result["sent_configuration_sha256"] = digest(configuration)
     return result

@@ -218,8 +218,19 @@ class CheckpointAndPolicyTest(unittest.TestCase):
         zoom = {**fields, "pass": "zoom", "inference_id": "c", "points": {**points, "noseTip": [110, 150]}}
         metrics = {"error_px": {"chin": 1, "noseTip": 1, "browL": 1}, "missed_visible": [],
                    "false_positive_on_occluded": ["browL"]}
-        report = {"model_version": "model", "readings": [
+        report = {"model_version": "model", "invalid_responses": 0, "readings": [
             {"sent_configuration_sha256": "a" * 64, "metrics": metrics},
             {"sent_configuration_sha256": "a" * 64, "metrics": metrics},
         ]}
         self.assertEqual(qualified_points(a, b, zoom, report), {"chin"})
+
+    def test_neutral_and_expression_side_occlusions_exist_for_both_sides(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            landmark_calibration.generate(root)
+            for side, suffix in (("left", "L"), ("right", "R")):
+                neutral = json.loads((root / f"{side}-side-hidden.truth.json").read_text())
+                expression = json.loads((root / f"expression-{side}-side-hidden.truth.json").read_text())
+                self.assertEqual(set(neutral["missing"]), {f"cheek{suffix}", f"ear{suffix}", f"eye{suffix}_outer", f"brow{suffix}"})
+                self.assertEqual(set(expression["missing"]), {f"eye{suffix}_outer", f"brow{suffix}"})
+                self.assertEqual(len(expression["points"]) + len(expression["missing"]), 13)

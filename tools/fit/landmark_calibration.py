@@ -29,6 +29,13 @@ OCCLUSION = '<path d="M88 82 Q108 53 137 68 Q152 81 144 114 L126 102 Q112 118 94
 
 
 BASE_CASES = ("neutral", "translated", "scaled-occluded")
+HAIR_CASES = {
+    "left-side-hidden": ('<path d="M52 82 Q96 52 140 66 Q142 86 139 102 L115 106 L105 135 Q96 156 61 165 Q62 130 52 82Z" fill="white"/>',
+                         {"cheekL", "earL", "eyeL_outer", "browL"}),
+    "right-side-hidden": ('<g transform="translate(320 0) scale(-1 1)"><path d="M52 82 Q96 52 140 66 Q142 86 139 102 L115 106 L105 135 Q96 156 61 165 Q62 130 52 82Z" fill="white"/></g>',
+                          {"cheekR", "earR", "eyeR_outer", "browR"}),
+}
+
 EXPRESSION_CASES = {
     "smile": (
         FACE.replace('M140 185h40', '')
@@ -45,7 +52,7 @@ EXPRESSION_CASES = {
 
 
 def case_names(name):
-    if name not in EXPRESSION_CASES:
+    if name not in EXPRESSION_CASES and not name.startswith("expression-"):
         return POINTS.keys()
     return POINTS.keys() - {"chin", "cheekL", "cheekR", "earL", "earR", "noseTip"}
 
@@ -58,16 +65,20 @@ def generate(output):
         ('scaled-occluded', 1.25, 5, 16, True),
         ('smile', 1, 15, 10, False),
         ('angry', 1, 20, 18, False),
+        ('left-side-hidden', 1, 20, 18, False),
+        ('right-side-hidden', 1, 20, 18, False),
+        ('expression-left-side-hidden', 1, 20, 18, False),
+        ('expression-right-side-hidden', 1, 20, 18, False),
     ):
-        cover = OCCLUSION if hidden else ''
+        cover, hidden_names = HAIR_CASES.get(name.removeprefix("expression-"), (OCCLUSION, {'browL'}) if hidden else ('', set()))
         face, changes = EXPRESSION_CASES.get(name, (FACE, {}))
         svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="408" height="408" viewBox="0 0 408 408"><rect width="408" height="408" fill="white"/><g transform="translate({dx} {dy}) scale({scale})" fill="none" stroke="#151515" stroke-width="1">{face}{cover}</g></svg>\n'
         image = output / f'{name}.svg'
         image.write_text(svg)
         points = {key: [x * scale + dx, y * scale + dy] for key, (x, y) in (POINTS | changes).items()
-                  if key in case_names(name) and not (hidden and key == 'browL')}
+                  if key in case_names(name) and key not in hidden_names}
         record = dict(image_sha256=hashlib.sha256(image.read_bytes()).hexdigest(),
-                      size=[408, 408], points=points, missing=['browL'] if hidden else [])
+                      size=[408, 408], points=points, missing=sorted(hidden_names & case_names(name)))
         image.with_suffix('.truth.json').write_text(json.dumps(record, indent=2) + '\n')
 
 

@@ -113,11 +113,13 @@ def measure(manifest):
             samples[name].append((difference_squared, width))
     if len(configurations) != 1:
         raise ValueError("all passes must use the same model version and prompt")
+    if len(excluded) == len(sessions):
+        raise ValueError("no reference has a usable face width")
     results = {}
     for name in sorted(NAMES):
         observations = samples[name]
         sigma = None
-        if observations:
+        if len(observations) >= 3:
             normalized = math.sqrt(mean(delta / width ** 2 for delta, width in observations))
             floor = math.sqrt(mean((2 / width) ** 2 for _, width in observations))
             sigma = 100 * max(normalized, floor)
@@ -126,8 +128,10 @@ def measure(manifest):
             "detected_both": paired_counts[name],
             "one_sided": first_counts[name] + second_counts[name] - 2 * paired_counts[name],
             "paired_sheets": len(observations), "sigma_pct_face_width": sigma,
+            "insufficient": len(observations) < 3,
         }
-    return {"landmarks": results, "excluded_face_width": excluded}
+    return {"landmarks": results, "input_sheets": len(sessions),
+            "included_face_width_sheets": len(sessions) - len(excluded), "excluded_face_width": excluded}
 
 
 if __name__ == "__main__":

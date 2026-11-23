@@ -3,8 +3,13 @@ import math
 
 from landmark_calibration import summarize
 
+POLICY_VERSION = "r4-calibration-v2"
+OCCLUSION_REQUIRED = {"cheekL", "cheekR", "earL", "earR", "eyeL_outer", "eyeR_outer", "browL", "browR"}
+
 
 def qualified_points(first, second, zoom, report):
+    if report.get("invalid_responses") != 0:
+        raise ValueError("fit needs a calibration report without invalid responses")
     model = first["model_version"]
     configuration = first["sent_configuration_sha256"]
     if (len(configuration) != 64 or report["model_version"] != model
@@ -12,6 +17,7 @@ def qualified_points(first, second, zoom, report):
         raise ValueError("fit needs two readings from the calibrated configuration")
     bound_fields = ("reference_id", "image_sha256", "record_sha256", "image", "size", "position", "origin", "expression")
     if (zoom.get("pass") != "zoom" or zoom.get("model_version") != model
+            or zoom.get("sent_configuration_sha256") != configuration
             or any(zoom.get(field) != first[field] for field in bound_fields)
             or not zoom.get("inference_id") or zoom["inference_id"] in {first["inference_id"], second["inference_id"]}):
         raise ValueError("zoom reading does not match the fitted reference")
@@ -26,6 +32,7 @@ def qualified_points(first, second, zoom, report):
         if (item["visible_readings"] >= 2 and item["detection_rate"] >= 0.9
                 and item["rms_px"] is not None and item["rms_px"] <= 2
                 and item["false_positive_on_occluded"] == 0
+                and (name not in OCCLUSION_REQUIRED or item["occluded_readings"] >= 2)
                 and all(math.dist(reading["points"][name], zoom["points"][name]) <= 3
                         for reading in (first, second))):
             allowed.add(name)

@@ -41,7 +41,7 @@ def checked_fixtures(fixtures, model, cases):
         if binding != raster:
             raise ValueError(f"fixture raster changed: {name}; render the fixtures again")
         with Image.open(BytesIO(png)) as image:
-            definitions = runner.definitions_for(name if name in calibration.EXPRESSION_CASES else "neutral")
+            definitions = runner.definitions_for("neutral" if len(calibration.case_names(name)) == 19 else "expression")
             request = runner.make_request(image.convert("RGB"), definitions, model)
         if request["size"] != truth["size"]:
             raise ValueError(f"fixture raster dimensions changed: {name}")
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fixtures", required=True, type=Path)
     parser.add_argument("--model", required=True)
-    parser.add_argument("--expanded", action="store_true", help="also read two expression fixtures (four extra calls)")
+    parser.add_argument("--expanded", action="store_true", help="also read expression and side-occlusion fixtures (twelve extra calls)")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--adapter", required=True, nargs=argparse.REMAINDER)
     args = parser.parse_args()
@@ -116,7 +116,10 @@ if __name__ == "__main__":
         with calibration_lock(args.output):
             if args.output.exists():
                 raise ValueError("provide a new output path")
-            cases = calibration.BASE_CASES + tuple(calibration.EXPRESSION_CASES) if args.expanded else calibration.BASE_CASES
+            cases = calibration.BASE_CASES
+            if args.expanded:
+                sides = tuple(calibration.HAIR_CASES)
+                cases += tuple(calibration.EXPRESSION_CASES) + sides + tuple("expression-" + side for side in sides)
             result = evaluate(args.fixtures, args.model, args.adapter, args.output.with_suffix(".checkpoint"), cases)
             with args.output.open("x") as destination:
                 json.dump(result, destination, indent=2, allow_nan=False)
