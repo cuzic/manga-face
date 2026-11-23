@@ -34,6 +34,16 @@ def checked_fixtures(fixtures, model, cases):
     return inputs
 
 
+def summarize_usage(readings):
+    fields = ("input_tokens", "cached_input_tokens", "output_tokens")
+    totals = {}
+    for field in fields:
+        values = [(reading.get("usage") or {}).get(field) for reading in readings]
+        reported = [value for value in values if type(value) is int and value >= 0]
+        totals[field] = {"total_reported": sum(reported), "readings_reported": len(reported)}
+    return totals
+
+
 def evaluate(fixtures, model, adapter, checkpoint, cases=calibration.BASE_CASES):
     inputs = checked_fixtures(fixtures, model, cases)
     checkpoint.mkdir(mode=0o700, exist_ok=True)
@@ -72,9 +82,11 @@ def evaluate(fixtures, model, adapter, checkpoint, cases=calibration.BASE_CASES)
             scores.append({
                 **identity, "inference_id": response_id, "prediction": prediction,
                 "metrics": calibration.score(truth, prediction),
+                "usage": response.get("usage"),
             })
     return {
         "model_version": model, "readings": scores,
+        "usage_summary": summarize_usage(scores),
         "landmark_summary": calibration.summarize([reading["metrics"] for reading in scores]),
     }
 

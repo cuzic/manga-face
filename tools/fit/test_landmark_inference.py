@@ -13,6 +13,7 @@ from PIL import Image
 import landmark_calibration
 import landmark_inference
 import openai_landmark_adapter
+import run_landmark_calibration
 
 
 class LandmarkInferenceTest(unittest.TestCase):
@@ -85,6 +86,7 @@ class OpenAiAdapterTest(unittest.TestCase):
         result = {"status": "completed", "model": "test-v1", "id": "response-one", "output": [
             {"type": "message", "content": [{"type": "output_text", "text": '{"chin":{"x":2,"y":3,"reason":null}}'}]}
         ]}
+        result["usage"] = {"input_tokens": 256, "input_tokens_details": {"cached_tokens": 32}, "output_tokens": 121}
         with patch.object(openai_landmark_adapter, "urlopen", return_value=StringIO(json.dumps(result))) as post:
             actual = openai_landmark_adapter.main(task, "test-key")
         body = json.loads(post.call_args.args[0].data)
@@ -92,6 +94,7 @@ class OpenAiAdapterTest(unittest.TestCase):
         self.assertEqual(body["input"][0]["content"][1]["image_url"], "data:image/png;base64,AAAA")
         self.assertTrue(body["text"]["format"]["strict"])
         self.assertEqual(actual["points"], {"chin": [2, 3]})
+        self.assertEqual(actual["usage"], {"input_tokens": 256, "cached_input_tokens": 32, "output_tokens": 121})
 
     def test_rejects_refusal(self):
         result = {"status": "completed", "model": "test-v1", "output": [
@@ -145,3 +148,13 @@ class CalibrationSummaryTest(unittest.TestCase):
         self.assertEqual(brow["rms_px"], 2)
         self.assertEqual(summary["chin"]["max_px"], 4)
         self.assertAlmostEqual(summary["chin"]["rms_px"], (25 / 3) ** 0.5)
+
+    def test_usage_distinguishes_zero_cached_tokens_from_missing_counts(self):
+        summary = run_landmark_calibration.summarize_usage([
+            {"usage": {"input_tokens": 100, "cached_input_tokens": 0, "output_tokens": 50}},
+            {"usage": {"input_tokens": 150, "cached_input_tokens": 25, "output_tokens": 90}},
+            {"usage": None},
+        ])
+        self.assertEqual(summary["input_tokens"], {"total_reported": 250, "readings_reported": 2})
+        self.assertEqual(summary["cached_input_tokens"], {"total_reported": 25, "readings_reported": 2})
+        self.assertEqual(summary["output_tokens"], {"total_reported": 140, "readings_reported": 2})

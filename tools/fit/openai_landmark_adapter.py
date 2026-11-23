@@ -70,7 +70,15 @@ def parse_reading(response, model, names):
             missing[name] = reason
         else:
             raise ValueError("vision model returned an inconsistent point")
-    return {"model_version": model, "inference_id": response["id"], "points": points, "missing": missing}
+    reading = {"model_version": model, "inference_id": response["id"], "points": points, "missing": missing}
+    usage = response.get("usage")
+    if isinstance(usage, dict):
+        reading["usage"] = {
+            "input_tokens": usage.get("input_tokens"),
+            "cached_input_tokens": (usage.get("input_tokens_details") or {}).get("cached_tokens"),
+            "output_tokens": usage.get("output_tokens"),
+        }
+    return reading
 
 
 def main(task, key):
