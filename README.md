@@ -46,3 +46,11 @@ Work is done by agents from task specs (Issues titled `[codex] …`): see `AGENT
 - **Code: MIT** (`LICENSE`).
 - **The art that the code generates (the SVG, the manifests, the goldens): CC0-1.0** (public domain dedication). The manifests carry `license: {spdx: 'CC0-1.0', …}`.
 - All art is original geometry written as code. No generative-model output, no tracing, no reference-matched art; `PROVENANCE.md` records each part.
+
+## 参考用の表情シートを生成する
+
+ADR 0002 R1 の開発者用ツール。初回の本番生成は owner の予算承認後に実行する。
+
+- `python3 tools/fit/generate.py submit` で費用を確認し、承認後に `--yes` を付けて送信する。送信と取得は環境変数 `OPENAI_API_KEY` を使う。
+- 表示された ID を `python3 tools/fit/generate.py collect <batch-id>` に渡す。処理中は同じ ID で再実行できる。
+- PNG と確認前の来歴記録は `refs/ai/pending/<batch-id>/` に保存される。送信の成否が不明なときは、再送信の前にローカルの `submission-*` の記録と API ダッシュボードを確認する。
