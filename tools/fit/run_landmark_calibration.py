@@ -1,5 +1,7 @@
 """Score independent vision-adapter readings against synthetic D4 fixtures."""
 import argparse
+from contextlib import contextmanager
+import fcntl
 import hashlib
 from io import BytesIO
 import json
@@ -10,6 +12,17 @@ from PIL import Image
 
 import landmark_calibration as calibration
 import landmark_inference as runner
+
+@contextmanager
+def calibration_lock(output):
+    lock_path = output.with_suffix(".lock")
+    with lock_path.open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise ValueError("calibration is already running for this output") from error
+        yield
+
 
 def checked_fixtures(fixtures, model, cases):
     inputs = []
@@ -100,12 +113,15 @@ if __name__ == "__main__":
     parser.add_argument("--adapter", required=True, nargs=argparse.REMAINDER)
     args = parser.parse_args()
     try:
-        if not args.adapter or args.output.exists():
-            raise ValueError("provide an adapter command and a new output path")
-        cases = calibration.BASE_CASES + tuple(calibration.EXPRESSION_CASES) if args.expanded else calibration.BASE_CASES
-        result = evaluate(args.fixtures, args.model, args.adapter, args.output.with_suffix(".checkpoint"), cases)
-        with args.output.open("x") as destination:
-            json.dump(result, destination, indent=2, allow_nan=False)
-            destination.write("\n")
+        if not args.adapter:
+            raise ValueError("provide an adapter command")
+        with calibration_lock(args.output):
+            if args.output.exists():
+                raise ValueError("provide a new output path")
+            cases = calibration.BASE_CASES + tuple(calibration.EXPRESSION_CASES) if args.expanded else calibration.BASE_CASES
+            result = evaluate(args.fixtures, args.model, args.adapter, args.output.with_suffix(".checkpoint"), cases)
+            with args.output.open("x") as destination:
+                json.dump(result, destination, indent=2, allow_nan=False)
+                destination.write("\n")
     except (OSError, KeyError, TypeError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(2, f"{error}\n")

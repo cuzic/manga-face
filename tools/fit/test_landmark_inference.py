@@ -158,3 +158,13 @@ class CalibrationSummaryTest(unittest.TestCase):
         self.assertEqual(summary["input_tokens"], {"total_reported": 250, "readings_reported": 2})
         self.assertEqual(summary["cached_input_tokens"], {"total_reported": 25, "readings_reported": 2})
         self.assertEqual(summary["output_tokens"], {"total_reported": 140, "readings_reported": 2})
+
+    def test_calibration_output_lock_rejects_a_second_writer_then_releases(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "report.json"
+            with run_landmark_calibration.calibration_lock(output):
+                with self.assertRaisesRegex(ValueError, "already running"):
+                    with run_landmark_calibration.calibration_lock(output):
+                        self.fail("acquired an occupied calibration lock")
+            with run_landmark_calibration.calibration_lock(output):
+                self.assertFalse(output.exists())
