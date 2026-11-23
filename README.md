@@ -54,3 +54,16 @@ ADR 0002 R1 の開発者用ツール。初回の本番生成は owner の予算�
 - `python3 tools/fit/generate.py submit` で費用を確認し、承認後に `--yes` を付けて送信する。送信と取得は環境変数 `OPENAI_API_KEY` を使う。
 - 表示された ID を `python3 tools/fit/generate.py collect <batch-id>` に渡す。処理中は同じ ID で再実行できる。
 - PNG と確認前の来歴記録は `refs/ai/pending/<batch-id>/` に保存される。送信の成否が不明なときは、再送信の前にローカルの `submission-*` の記録と API ダッシュボードを確認する。
+
+### AI によるランドマーク計測
+
+ADR 0002 R4 の開発用ツール。次のコマンドで、座標が既知の校正用 SVG と 408 × 408 px の PNG を作る。Python の計測ツールには Pillow が必要。
+
+```sh
+python3 tools/fit/landmark_calibration.py generate out/landmark-fixtures
+node tools/fit/render_landmark_fixtures.ts out/landmark-fixtures
+```
+
+`run_landmark_calibration.py --fixtures <directory> --model <model-version> --output <report.json> --adapter <command>` は、校正画像を各 2 回読み取り、正解座標を使って誤差と欠測を集計する。実行モデルには画像とランドマークの定義を渡す。
+
+`landmark_inference.py <sheet.png> <prepared-manifest.json> <output-directory> --model <model-version> --adapter <command>` は、R2/R3 の採用記録と前処理マニフェストに紐づく座標候補を出力する。シート、来歴、出力は非公開の作業場所に置く。`--adapter` 以降には、標準入力と標準出力を使うアダプターの実行コマンドを指定する。OpenAI 用アダプターは `python3 tools/fit/openai_landmark_adapter.py`。環境変数 `OPENAI_API_KEY` を使い、実 API の試験は予算承認後に行う。
