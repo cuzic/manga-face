@@ -1,5 +1,6 @@
 """Vectorizes the dark layer (ink lines) and the silhouette of a reference with potrace's algorithm (the pure-Python port `potracer`).
 usage: python tools/fit/vectorize.py <ref.png> <outdir> [ink_threshold=140]
+Sheet mode: python tools/fit/vectorize.py <sheet.png> <outdir> --sheet-record <reviewed.json>
 The result is a measurement and an input to later steps (ADR 0002 D3); a traced shape ships only under the rule of ADR 0002 D6.
 Note: potrace outlines FILLED shapes, so a drawn line of width w comes out as one closed contour around the stroke (two edges). For line-art references the
 vectorized outline is therefore used for the hair silhouette and as the ink mask of the distance measure (ADR 0002 D5), not as a centre line.
