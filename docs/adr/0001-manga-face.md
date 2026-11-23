@@ -152,6 +152,8 @@ type Palette = {skin: SkinKey | `#${string}`; hair: HairKey | `#${string}`; top:
 
 これでも残るもの(範囲が両方の下限を満たせない、眉と目の間など)は、`validate` が報告する。
 
+**U1 の検査順(実装済み)**: 範囲・毛束数・パレットは元の入力で検査し、幾何は正規化後に検査する。
+
 **`validate` は構造化された違反を返す**: `{group: 'head' | 'eyes' | 'brows' | 'mouth' | 'hair' | 'palette', code: string, expression?: string, message: string}[]`。`code` は決まった名前(`range`、`strands`、`palette`、`face-self-intersect`、`head-circle`、`hair-self-intersect`、`eye-outside-face`、`eyes-touch`、`brow-into-eye`、`brow-outside-head`、`mouth-outside-face`、`mouth-reaches-chin`、`mouth-anchor`、`mouth-near-eyes`)で、**修復はメッセージの語句ではなく `group` と `code` で決める**。メッセージは人が読むためのもの。原因が別の群にある違反(眉が目に入るのは `eyes.h` が原因のことがある)は、`group` を原因の側にするか、複数の群を返す(修復が効く側を引き直せる)。
 
 **不変条件**(`validate` がパラメータと全表情のあと、**幾何として**検査する。`loadCharacter` は絵の幾何を検査しないので、ライブラリが責任を持つ。落ちたら `toManifest` が例外を投げ、違反の一覧を出す):
