@@ -41,7 +41,7 @@ n3. Test fixture renamed `before-split.json` -> `face-snapshots.json` mixes a pu
 - Goldens: 6 files. young-short-neutral diff is only the brow keyline (5.5 unclipped -> 8.6 clipped, clipPath added); young-bob-smile diff is eyes/brows shape (smile preset: eye height, tilt, squint, brow angle). Everything is explained by U2; nothing else changed.
 
 ## Look at stage scale (for the owner's checkpoint 1; not a code verdict)
-Stage PNG (1x and 2x rows, 6 characters): /tmp/claude-1002/-home-cuzic/af600e33-cecf-46a2-8d6d-e495e552245b/scratchpad/mf-pr12-stage.png
+Stage PNG (1x and 2x rows, 6 characters): (reviewer's local scratch file)
 Brow crops (3x): .../mf-pr12-brows-before.png and .../mf-pr12-brows-after.png (same dir).
 - The "bracket merging with fringe" is largely fixed: the white edge now follows the hair and no longer connects to the fringe outline on neutral. 
 - What remains for the owner to judge: on black hair, raised brows that sit fully inside the hair (young b surprise left brow, **think left brow**) read as a white outlined pill / hairpin, since ink brow on ink hair is only visible by the paper halo. This is the "sticker" look ADR D4 accepted, now thicker (8.6). Think's raised brow (raise 26) is the most conspicuous.
