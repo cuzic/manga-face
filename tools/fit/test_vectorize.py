@@ -28,7 +28,7 @@ class VectorizationTest(unittest.TestCase):
             color = Image.new("RGB", (80, 80), "white")
             drawing = ImageDraw.Draw(color)
             drawing.rectangle((10, 10, 24, 24), fill=(12, 30, 60))
-            drawing.ellipse((50, 50, 64, 64), fill=(45, 35, 28))
+            drawing.ellipse((50, 50, 64, 64), fill=(145, 145, 145))
             color.save(image)
             record = root / "sheet.provenance.json"
             record.write_text(json.dumps({
@@ -38,7 +38,7 @@ class VectorizationTest(unittest.TestCase):
                 "sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
                 "cells": [
                     {"position": 0, "expression": "neutral", "review": "accepted", "ink_threshold": 140},
-                    {"position": 1, "expression": "smile", "review": "discarded", "reason": "quality"},
+                    {"position": 1, "expression": "smile", "review": "discarded", "reason": "quality", "ink_threshold": 140},
                     {"position": 3, "expression": "angry", "review": "accepted", "ink_threshold": 150},
                 ],
             }))
@@ -53,3 +53,4 @@ class VectorizationTest(unittest.TestCase):
             self.assertEqual(manifest["cell_size"], [40, 40])
             self.assertEqual([cell["origin"] for cell in manifest["cells"]], [[0, 0], [40, 40]])
             self.assertEqual(manifest["cells"][0]["ink_pixels"], 225)
+            self.assertGreater(manifest["cells"][1]["ink_pixels"], 0)
