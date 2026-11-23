@@ -25,7 +25,7 @@ FACE = '''<ellipse cx="80" cy="143" rx="11" ry="15" fill="white"/>
 <path d="M155 151l5 7" />
 <circle cx="120" cy="124" r="6" fill="#151515"/>
 <circle cx="200" cy="124" r="6" fill="#151515"/>'''
-OCCLUSION = '<path d="M100 92h41v15h-41z" fill="#151515"/>'
+OCCLUSION = '<path d="M88 82 Q108 53 137 68 Q152 81 144 114 L126 102 Q112 118 94 117 Q101 99 88 82Z" fill="white"/>'
 
 
 BASE_CASES = ("neutral", "translated", "scaled-occluded")
@@ -44,6 +44,12 @@ EXPRESSION_CASES = {
 }
 
 
+def case_names(name):
+    if name not in EXPRESSION_CASES:
+        return POINTS.keys()
+    return POINTS.keys() - {"chin", "cheekL", "cheekR", "earL", "earR", "noseTip"}
+
+
 def generate(output):
     output.mkdir(parents=True, exist_ok=True)
     for name, scale, dx, dy, hidden in (
@@ -59,7 +65,7 @@ def generate(output):
         image = output / f'{name}.svg'
         image.write_text(svg)
         points = {key: [x * scale + dx, y * scale + dy] for key, (x, y) in (POINTS | changes).items()
-                  if not (hidden and key == 'browL')}
+                  if key in case_names(name) and not (hidden and key == 'browL')}
         record = dict(image_sha256=hashlib.sha256(image.read_bytes()).hexdigest(),
                       size=[408, 408], points=points, missing=['browL'] if hidden else [])
         image.with_suffix('.truth.json').write_text(json.dumps(record, indent=2) + '\n')
@@ -69,7 +75,7 @@ def score(truth, prediction):
     if prediction['image_sha256'] != truth['image_sha256'] or prediction['size'] != truth['size']:
         raise ValueError('prediction does not identify the calibration image')
     points, missing = prediction['points'], prediction['missing']
-    if points.keys() & set(missing) or points.keys() | set(missing) != POINTS.keys():
+    if points.keys() & set(missing) or points.keys() | set(missing) != truth['points'].keys() | set(truth['missing']):
         raise ValueError('each landmark must be marked or declared missing exactly once')
     width, height = truth['size']
     for point in points.values():
@@ -83,6 +89,7 @@ def score(truth, prediction):
         'detection_rate': len(errors) / len(expected),
         'false_positive_on_occluded': sorted(points.keys() - expected.keys()),
         'missed_visible': sorted(expected.keys() - points.keys()),
+        'occluded': truth['missing'],
         'rms_px': math.sqrt(mean(value ** 2 for value in errors.values())) if errors else None,
         'error_px': errors,
     }
@@ -96,11 +103,12 @@ def summarize(scores):
         missed = sum(name in score["missed_visible"] for score in scores)
         false_positives = sum(name in score["false_positive_on_occluded"] for score in scores)
         visible = len(errors) + missed
+        occluded = sum(name in score.get("occluded", ()) for score in scores)
         summary[name] = {
             "visible_readings": visible,
             "detected_visible": len(errors),
             "detection_rate": len(errors) / visible if visible else None,
-            "occluded_readings": len(scores) - visible,
+            "occluded_readings": occluded,
             "false_positive_on_occluded": false_positives,
             "rms_px": math.sqrt(mean(error ** 2 for error in errors)) if errors else None,
             "max_px": max(errors, default=None),

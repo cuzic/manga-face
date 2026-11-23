@@ -25,6 +25,7 @@ class LandmarkInferenceTest(unittest.TestCase):
             record = image.with_suffix(".provenance.json")
             cell = {"position": 0, "expression": "neutral", "review": "accepted"}
             record.write_text(json.dumps({"id": "synthetic", "kind": "ai-generated", "domain": "young",
+                                          "reviewer": "owner", "sha256": hashlib.sha256(image.read_bytes()).hexdigest(),
                                           "review": "accepted", "cells": [cell]}))
             manifest = root / "manifest.json"
             manifest.write_text(json.dumps({
@@ -39,7 +40,7 @@ class LandmarkInferenceTest(unittest.TestCase):
             def fake_call(command, *, input, **kwargs):
                 import base64
                 request = json.loads(input)
-                self.assertEqual(Image.open(BytesIO(base64.b64decode(request["image_png_base64"]))).size, (16, 16))
+                self.assertEqual(Image.open(BytesIO(base64.b64decode(request["image_png_base64"]))).size, tuple(request["size"]))
                 requests.append(request)
                 result = {"model_version": "test-v1", "inference_id": f"call-{len(requests)}",
                           "points": {}, "missing": dict.fromkeys(landmark_inference.DEFINITIONS, "hidden")}
@@ -65,6 +66,7 @@ class LandmarkInferenceTest(unittest.TestCase):
                         adapter.assert_not_called()
                     self.assertFalse((root / "rejected").exists())
             self.assertEqual(requests[0], requests[1])
+            self.assertEqual(requests[2]["size"], [32, 32])
             for number in (1, 2):
                 result = json.loads((destination / f"0-pass-{number}.json").read_text())
                 self.assertEqual(result["inference_id"], f"call-{number}")
@@ -93,6 +95,7 @@ class OpenAiAdapterTest(unittest.TestCase):
         self.assertFalse(body["store"])
         self.assertEqual(body["input"][0]["content"][1]["image_url"], "data:image/png;base64,AAAA")
         self.assertTrue(body["text"]["format"]["strict"])
+        self.assertEqual(actual["sent_request_sha256"], hashlib.sha256(post.call_args.args[0].data).hexdigest())
         self.assertEqual(actual["points"], {"chin": [2, 3]})
         self.assertEqual(actual["usage"], {"input_tokens": 256, "cached_input_tokens": 32, "output_tokens": 121})
 
@@ -139,7 +142,7 @@ class CalibrationSummaryTest(unittest.TestCase):
         scores = [
             {"error_px": {"chin": 3, "browL": 2}, "missed_visible": [], "false_positive_on_occluded": []},
             {"error_px": {"chin": 4}, "missed_visible": ["browL"], "false_positive_on_occluded": []},
-            {"error_px": {"chin": 0}, "missed_visible": [], "false_positive_on_occluded": ["browL"]},
+            {"error_px": {"chin": 0}, "missed_visible": [], "false_positive_on_occluded": ["browL"], "occluded": ["browL"]},
         ]
         summary = landmark_calibration.summarize(scores)
         brow = summary["browL"]
@@ -181,3 +184,42 @@ class RepeatabilityWidthTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "cheek is missing"):
             face_width({}, (a, b), "fixture")
         self.assertEqual(face_width({"face_width_px": 194}, (a, b), "fixture"), 194)
+
+
+class CheckpointAndPolicyTest(unittest.TestCase):
+    def test_invalid_response_is_saved_without_resending(self):
+        from vision_checkpoint import decode, read_or_attempt
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result = subprocess.CompletedProcess(["mock"], 0, '{"error":"invalid structured output"}', "")
+            with patch("vision_checkpoint.subprocess.run", return_value=result) as adapter:
+                first = read_or_attempt(root, "pass-1", {}, {}, ["mock"])
+                with self.assertRaisesRegex(ValueError, "invalid structured output"):
+                    decode(first)
+                self.assertEqual(read_or_attempt(root, "pass-1", {}, {}, ["mock"]), first)
+                adapter.assert_called_once()
+            with patch("vision_checkpoint.subprocess.run", side_effect=subprocess.TimeoutExpired("mock", 10)) as adapter:
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    read_or_attempt(root, "pass-2", {}, {}, ["mock"])
+                with self.assertRaisesRegex(ValueError, "outcome unknown"):
+                    read_or_attempt(root, "pass-2", {}, {}, ["mock"])
+                adapter.assert_called_once()
+
+    def test_calibration_and_zoom_filter_out_unsafe_points(self):
+        from landmark_policy import qualified_points
+
+        fields = dict(reference_id="id", image_sha256="image-hash", record_sha256="record-hash", image="sheet.png",
+                      size=[408, 408], position=0, origin=[0, 0], expression="neutral", model_version="model",
+                      sent_configuration_sha256="a" * 64)
+        points = {"chin": [100, 200], "noseTip": [100, 150], "browL": [80, 110]}
+        a = {**fields, "pass": 1, "inference_id": "a", "points": points}
+        b = {**fields, "pass": 2, "inference_id": "b", "points": points}
+        zoom = {**fields, "pass": "zoom", "inference_id": "c", "points": {**points, "noseTip": [110, 150]}}
+        metrics = {"error_px": {"chin": 1, "noseTip": 1, "browL": 1}, "missed_visible": [],
+                   "false_positive_on_occluded": ["browL"]}
+        report = {"model_version": "model", "readings": [
+            {"sent_configuration_sha256": "a" * 64, "metrics": metrics},
+            {"sent_configuration_sha256": "a" * 64, "metrics": metrics},
+        ]}
+        self.assertEqual(qualified_points(a, b, zoom, report), {"chin"})

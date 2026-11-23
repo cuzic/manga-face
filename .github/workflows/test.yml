@@ -27,7 +27,7 @@ jobs:
       - if: matrix.node == 22
         run: |
           python3 -m venv "$RUNNER_TEMP/manga-face-fit"
-          "$RUNNER_TEMP/manga-face-fit/bin/python" -m pip install pillow==13.0.0
+          "$RUNNER_TEMP/manga-face-fit/bin/python" -m pip install pillow==13.0.0 jsonschema==4.26.0
           "$RUNNER_TEMP/manga-face-fit/bin/python" -m unittest discover -s tools/fit -p 'test_*.py'
   # The goldens (goldens/*.svg) are rebuilt and compared byte for byte. Faces have no text, so no fonts are involved: plain SVG is the same on every machine.
   # The whole gallery is rendered too and kept as an artifact, so a reviewer can look at it.

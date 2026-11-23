@@ -12,6 +12,7 @@ from PIL import Image
 
 import landmark_calibration as calibration
 import landmark_inference as runner
+from vision_checkpoint import decode, read_or_attempt
 
 @contextmanager
 def calibration_lock(output):
@@ -40,10 +41,11 @@ def checked_fixtures(fixtures, model, cases):
         if binding != raster:
             raise ValueError(f"fixture raster changed: {name}; render the fixtures again")
         with Image.open(BytesIO(png)) as image:
-            request = runner.make_request(image.convert("RGB"), runner.DEFINITIONS, model)
+            definitions = runner.definitions_for(name if name in calibration.EXPRESSION_CASES else "neutral")
+            request = runner.make_request(image.convert("RGB"), definitions, model)
         if request["size"] != truth["size"]:
             raise ValueError(f"fixture raster dimensions changed: {name}")
-        inputs.append((name, truth, raster, request))
+        inputs.append((name, truth, raster, request, definitions))
     return inputs
 
 
@@ -62,44 +64,40 @@ def evaluate(fixtures, model, adapter, checkpoint, cases=calibration.BASE_CASES)
     checkpoint.mkdir(mode=0o700, exist_ok=True)
     scores = []
     seen = set()
-    for name, truth, raster, request in inputs:
+    for name, truth, raster, request, definitions in inputs:
         for repeat in (1, 2):
             identity = {
                 "fixture": name, "pass": repeat, "model_version": model,
                 **raster,
                 "prompt_sha256": hashlib.sha256(request["prompt"].encode()).hexdigest(),
             }
-            saved = checkpoint / f"{name}-{repeat}.json"
-            if saved.exists():
-                entry = json.loads(saved.read_text())
-                if any(entry["identity"].get(key) != value for key, value in identity.items()):
-                    raise ValueError(f"checkpoint differs from the requested run: {saved.name}")
-                response = entry["response"]
-            else:
-                process = subprocess.run(adapter, input=json.dumps(request), check=True,
-                                         text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
-                response = json.loads(process.stdout)
-            response_id, points, missing = runner.check_response(
-                response, runner.DEFINITIONS.keys(), request["size"], model)
-            if response_id in seen:
-                raise ValueError("adapter reused an inference ID")
-            seen.add(response_id)
-            if not saved.exists():
-                temporary = saved.with_suffix(".pending")
-                with temporary.open("x") as out:
-                    json.dump({"identity": identity, "response": response}, out, indent=2)
-                    out.write("\n")
-                temporary.rename(saved)
+            entry = read_or_attempt(checkpoint, f"{name}-{repeat}", identity, request, adapter)
+            response = {}
+            error = None
+            response_id = None
+            try:
+                response = json.loads(entry["stdout"]) if entry["exit_code"] == 0 else {}
+                response_id, points, missing = runner.check_response(
+                    decode(entry), definitions.keys(), request["size"], model)
+                if response_id in seen:
+                    raise ValueError("adapter reused an inference ID")
+                seen.add(response_id)
+            except (KeyError, TypeError, ValueError):
+                error = "adapter response failed validation"
+                points, missing = {}, dict.fromkeys(definitions, error)
             prediction = {"points": points, "missing": missing,
                           "image_sha256": truth["image_sha256"], "size": request["size"]}
             scores.append({
                 **identity, "inference_id": response_id, "prediction": prediction,
                 "metrics": calibration.score(truth, prediction),
-                "usage": response.get("usage"),
+                "usage": response.get("usage"), "error": error,
+                "sent_request_sha256": response.get("sent_request_sha256"),
+                "sent_configuration_sha256": response.get("sent_configuration_sha256"),
             })
     return {
         "model_version": model, "readings": scores,
         "usage_summary": summarize_usage(scores),
+        "invalid_responses": sum(reading["error"] is not None for reading in scores),
         "landmark_summary": calibration.summarize([reading["metrics"] for reading in scores]),
     }
 

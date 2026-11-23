@@ -61,6 +61,10 @@ def measure(manifest):
     if len(sessions) != 5:
         raise ValueError("expected five reference sheets")
     samples = defaultdict(list)
+    first_counts = defaultdict(int)
+    second_counts = defaultdict(int)
+    paired_counts = defaultdict(int)
+    excluded = {}
     reference_ids = set()
     configurations = set()
     inference_ids = set()
@@ -79,7 +83,7 @@ def measure(manifest):
             "origin": neutral["origin"],
         }
         for reading in (a, b):
-            model, prompt = reading["model_version"], reading["prompt_sha256"]
+            model, prompt = reading["model_version"], reading["sent_configuration_sha256"]
             inference_id = reading["inference_id"]
             if not isinstance(model, str) or not model.strip() or not re.fullmatch(r"[a-f0-9]{64}", prompt):
                 raise ValueError("expected a model version and prompt SHA-256")
@@ -93,7 +97,17 @@ def measure(manifest):
         if reference in reference_ids:
             raise ValueError("expected five distinct reference sheets")
         reference_ids.add(reference)
-        width = face_width(session, (a, b), reference)
+        for name in a["points"]:
+            first_counts[name] += 1
+        for name in b["points"]:
+            second_counts[name] += 1
+        for name in a["points"].keys() & b["points"].keys():
+            paired_counts[name] += 1
+        try:
+            width = face_width(session, (a, b), reference)
+        except ValueError as error:
+            excluded[reference] = str(error)
+            continue
         for name in a["points"].keys() & b["points"].keys():
             difference_squared = math.dist(a["points"][name], b["points"][name]) ** 2 / 4
             samples[name].append((difference_squared, width))
@@ -107,8 +121,13 @@ def measure(manifest):
             normalized = math.sqrt(mean(delta / width ** 2 for delta, width in observations))
             floor = math.sqrt(mean((2 / width) ** 2 for _, width in observations))
             sigma = 100 * max(normalized, floor)
-        results[name] = {"paired_sheets": len(observations), "sigma_pct_face_width": sigma}
-    return results
+        results[name] = {
+            "detected_first": first_counts[name], "detected_second": second_counts[name],
+            "detected_both": paired_counts[name],
+            "one_sided": first_counts[name] + second_counts[name] - 2 * paired_counts[name],
+            "paired_sheets": len(observations), "sigma_pct_face_width": sigma,
+        }
+    return {"landmarks": results, "excluded_face_width": excluded}
 
 
 if __name__ == "__main__":

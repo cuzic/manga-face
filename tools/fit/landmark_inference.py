@@ -16,6 +16,7 @@ import tempfile
 from PIL import Image
 
 from generate import EXPRESSIONS
+from vision_checkpoint import decode, read_or_attempt
 
 DEFINITIONS = {
     "chin": "Lowest point of the face outline.",
@@ -38,6 +39,11 @@ for side, label in (("L", "image-left eye"), ("R", "image-right eye")):
         f"eye{side}_bottom": f"{label}: lowest point of the eye ink.",
     })
 NEUTRAL_ONLY = {"chin", "cheekL", "cheekR", "earL", "earR", "noseTip"}
+
+
+def definitions_for(expression):
+    return {name: definition for name, definition in DEFINITIONS.items()
+            if expression == "neutral" or name not in NEUTRAL_ONLY}
 
 
 def make_request(image, definitions, model):
@@ -111,6 +117,8 @@ def run(image_path, manifest_path, destination, model, adapter):
             or hashlib.sha256(record_bytes).hexdigest() != prepared["record_sha256"]):
         raise ValueError("input image or provenance differs from the prepared manifest")
     record = json.loads(record_bytes)
+    if record.get("sha256") != prepared["image_sha256"] or not str(record.get("reviewer") or "").strip():
+        raise ValueError("the approved record must identify the source image and its reviewer")
     cells = checked_cells(record, prepared)
     width, height = prepared["cell_size"]
     image = Image.open(BytesIO(image_bytes)).convert("RGB")
@@ -125,15 +133,19 @@ def run(image_path, manifest_path, destination, model, adapter):
         for cell in cells:
             expression, position = cell["expression"], cell["position"]
             x, y = cell["origin"]
-            definitions = {name: definition for name, definition in DEFINITIONS.items()
-                           if expression == "neutral" or name not in NEUTRAL_ONLY}
+            definitions = definitions_for(expression)
             request = make_request(image.crop((x, y, x + width, y + height)), definitions, model)
             prompt = request["prompt"]
-            for pass_number in (1, 2):
-                result = subprocess.run(adapter, input=json.dumps(request), check=True,
-                                        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
-                inference_id, points, missing = check_response(
-                    json.loads(result.stdout), definitions.keys(), [width, height], model)
+            zoom = image.crop((x, y, x + width, y + height)).resize((width * 2, height * 2), Image.Resampling.LANCZOS)
+            for pass_number in (1, 2, "zoom"):
+                current_request = make_request(zoom, definitions, model) if pass_number == "zoom" else request
+                identity = {key: prepared[key] for key in ("reference_id", "image_sha256", "record_sha256")}
+                entry = read_or_attempt(destination.with_suffix(".checkpoint"), f"{position}-pass-{pass_number}",
+                                        identity, current_request, adapter)
+                response = decode(entry)
+                inference_id, points, missing = check_response(response, definitions.keys(), current_request["size"], model)
+                if pass_number == "zoom":
+                    points = {name: [coordinate // 2 for coordinate in point] for name, point in points.items()}
                 if inference_id in seen:
                     raise ValueError("adapter reused an inference ID")
                 seen.add(inference_id)
@@ -142,6 +154,9 @@ def run(image_path, manifest_path, destination, model, adapter):
                               prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
                               size=[width, height], expression=expression, position=position,
                               origin=[x, y], points=points, missing=missing)
+                for field in ("sent_request_sha256", "sent_configuration_sha256"):
+                    if field in response:
+                        output[field] = response[field]
                 output["pass"] = pass_number
                 (location / f"{position}-pass-{pass_number}.json").write_text(json.dumps(output, indent=2) + "\n")
         if destination.exists():

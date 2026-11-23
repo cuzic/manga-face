@@ -55,6 +55,15 @@ ADR 0002 R1 の開発者用ツール。初回の本番生成は owner の予算�
 - 表示された ID を `python3 tools/fit/generate.py collect <batch-id>` に渡す。処理中は同じ ID で再実行できる。
 - PNG と確認前の来歴記録は `refs/ai/pending/<batch-id>/` に保存される。送信の成否が不明なときは、再送信の前にローカルの `submission-*` の記録と API ダッシュボードを確認する。
 
+## 参考画像の採否を記録する
+
+ADR 0002 R2 の開発者用ツール。Python の依存バージョンは `tools/fit/requirements.txt` を参照。
+
+- `python3 tools/fit/review_reference.py list refs/ai/pending` で未審査のシートを表示する。
+- `review_reference.py review <sheet.png> <draft.json> <reviewed.json> --id ai-0001 --reviewer owner --reviewed-at YYYY-MM-DD --decision accepted` で採用結果を記録する。判断が異なるマスは `--discard-cell 2:quality` のように指定する。シート全体を不採用にする場合は `--decision discarded --reason quality` を指定する。採用した画像と記録は非公開の置き場に保管する。
+- `reference_record.py <sheet.png> <reviewed.json> --public-row` は `PROVENANCE.md` に載せる公開用の行を生成する。`--for-fit` は中立の採否と採用マスのしきい値を追加で検査する。
+- 当てはめには `fit.py <pass1.json> <pass2.json> <outdir> --reference-image <sheet.png> --record <reviewed.json>` を使う。先に記録と座標の対応を検査し、当てはめ実行時は `fit.json` と `derived.json` に方向と来歴のハッシュを保存する。既存 PD の回帰確認は `--fixture` を付ける。数値評価の依存は ADR 0002 R5 を参照。
+
 ### AI によるランドマーク計測
 
 ADR 0002 R4 の開発用ツール。次のコマンドで、座標が既知の校正用 SVG と 408 × 408 px の PNG を作る。Python の計測ツールには Pillow が必要。
@@ -67,3 +76,5 @@ node tools/fit/render_landmark_fixtures.ts out/landmark-fixtures
 `run_landmark_calibration.py --fixtures <directory> --model <model-version> --output <report.json> --adapter <command>` は、校正画像を各 2 回読み取り、正解座標を使って誤差と欠測を集計する。実行モデルには画像とランドマークの定義を渡す。既定は中立・平行移動・拡大と遮蔽の 3 枚。`--expanded` を指定すると笑顔と怒りの 2 枚も加わる。
 
 `landmark_inference.py <sheet.png> <prepared-manifest.json> <output-directory> --model <model-version> --adapter <command>` は、R2/R3 の採用記録と前処理マニフェストに紐づく座標候補を出力する。シート、来歴、出力は非公開の作業場所に置く。`--adapter` 以降には、標準入力と標準出力を使うアダプターの実行コマンドを指定する。OpenAI 用アダプターは `python3 tools/fit/openai_landmark_adapter.py`。環境変数 `OPENAI_API_KEY` を使い、実 API の試験は予算承認後に行う。
+
+AI 参考の当てはめには校正レポートを `--calibration`、同じマスの拡大読取りを `--zoom` で渡す。推論ランナーは各マスの独立した 2 回と拡大画像 1 回の読取りを出力する。
