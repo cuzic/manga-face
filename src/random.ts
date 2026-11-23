@@ -1,5 +1,5 @@
 import {HAIR, IRIS, SKIN, TOP} from './palette.ts';
-import {RANGES, clamp, normalize} from './params.ts';
+import {HAIR_TEMPLATES, RANGES, clamp, normalize} from './params.ts';
 import type {Character, RangeKey} from './params.ts';
 import {DIRECTIONS, HAIR_YOUNG} from './styles.ts';
 import {validate} from './validate.ts';
@@ -11,7 +11,8 @@ import type {Violation} from './validate.ts';
 const xmur3 = (str: string): number => { let h = 1779033703 ^ str.length; for (let i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); } h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return (h ^= h >>> 16) >>> 0; };
 const mulberry32 = (a: number): number => { let t = (a + 0x6d2b79f5) | 0; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 /** A seed is stable within one generator version (ADR 0001 D5). */
-export const GENERATOR = 2;
+export const GENERATOR = 3;
+const pickTemplate = (value: number): Character['hair']['template'] => HAIR_TEMPLATES[Math.floor(value * HAIR_TEMPLATES.length)] ?? 'short';
 type Group = Exclude<Violation['group'], 'palette'>;
 const GROUPS: readonly Group[] = ['head', 'eyes', 'brows', 'mouth', 'hair'];
 function drawGroup(seed: string, g: Group, k: number, cur: Character): Partial<Character> {
@@ -22,7 +23,7 @@ function drawGroup(seed: string, g: Group, k: number, cur: Character): Partial<C
     case 'eyes': return {eyes: {w: lerp('eyes.w', 18, 26), h: lerp('eyes.h', 14, 24), tilt: lerp('eyes.tilt', -3, 4), iris: lerp('eyes.iris', 0.8, 1.1), y: 20, gap: clamp(38 + (cur.head.cheek - 74) / 8, RANGES['eyes.gap']), lashes: u('lashes') < 0.7, lidW: lerp('eyes.lidW', 5, 7)}};
     case 'brows': return {brows: {thick: lerp('brows.thick', 4, 7), dy: lerp('brows.dy', -4, 3)}};
     case 'mouth': return {mouth: {w: lerp('mouth.w', 14, 24), y: 64}};
-    case 'hair': return {hair: {template: u('template') < 0.5 ? 'short' : 'bob', strands: clamp(3 + Math.floor(u('strands') * 5), RANGES['hair.strands']), parting: clamp(Math.round((u('parting') * 2 - 1) * 4) / 4, RANGES['hair.parting']), ahoge: u('ahoge') < 0.15 ? (u('ahogeSide') < 0.5 ? 'left' : 'right') : 'none', highlight: u('hl') < 0.8, sideLen: lerp('hair.sideLen', 20, 36)}};
+    case 'hair': return {hair: {template: pickTemplate(u('template')), strands: clamp(3 + Math.floor(u('strands') * 5), RANGES['hair.strands']), parting: clamp(Math.round((u('parting') * 2 - 1) * 4) / 4, RANGES['hair.parting']), ahoge: u('ahoge') < 0.15 ? (u('ahogeSide') < 0.5 ? 'left' : 'right') : 'none', highlight: u('hl') < 0.8, sideLen: lerp('hair.sideLen', 20, 36)}};
   }
 }
 // The sampler chooses valid palette keys up front and only redraws geometry groups.
