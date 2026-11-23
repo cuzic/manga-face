@@ -1,5 +1,5 @@
-"""Stage (a) of ADR 0002 D5: a landmark least-squares fit of the parametric model to the hand-marked landmarks of a reference.
-usage: python tools/fit/fit.py <pass1.json> <pass2.json> <outdir> [expression]
+"""Stage (a) of ADR 0002 D5: a landmark least-squares fit of the parametric model to two landmark readings of a reviewed reference.
+usage: python tools/fit/fit.py <pass1.json> <pass2.json> <outdir> [expression] --reference-image <image.png>
 - The reference's landmarks are the mean of the marking passes; each landmark's noise (sigma, px) is the spread between the passes (floor 2 px); residuals are reported in sigma units.
 - Unknowns: a global map image -> model (scale s, shift t; no rotation; closed form for given parameters) and 9 model parameters.
 - What is fitted and reported is what the model DRAWS: the landmarks come from `node tools/fit/landmarks.ts`, which applies normalize (the dependent constraints), and the
@@ -8,9 +8,12 @@ usage: python tools/fit/fit.py <pass1.json> <pass2.json> <outdir> [expression]
 - No crown landmark (the hair height belongs to the hair).
 - Deterministic: a coordinate descent on the parameter grid (the model snaps parameters to the steps of RANGES, so there is no gradient), from the young default.
 """
-import sys, json, subprocess
+import argparse, json, subprocess
 from pathlib import Path
 import numpy as np
+from jsonschema import ValidationError
+
+from reference_record import fit_inputs
 
 ROOT = Path(__file__).resolve().parents[2]
 PARAMS = [  # (path, lo, hi, step): the ranges of src/face.ts RANGES
@@ -44,21 +47,25 @@ def similarity(p, m, w):
     s = (W * (p - pc) * (m - mc)).sum() / (W * (p - pc) ** 2).sum()
     return s, mc - s * pc
 
-def load_landmarks(p1, p2, names):
-    a, b = json.loads(Path(p1).read_text()), json.loads(Path(p2).read_text())
+def load_landmarks(a, b, names):
     P = np.zeros((len(names), 2)); sigma = np.full(len(names), np.inf); present = np.zeros(len(names), bool)
     for i, n in enumerate(names):
         if n in a['points'] and n in b['points']:
             x, y = np.array(a['points'][n], float), np.array(b['points'][n], float)
             P[i] = (x + y) / 2; present[i] = True
             sigma[i] = max(2.0, float(np.sqrt(((x - y) ** 2).mean() / 2)))  # per-coordinate std of two readings, floor 2 px
+    if present.sum() < 2 or len(np.unique(P[present], axis=0)) < 2:
+        raise ValueError("fitting needs at least two distinct landmarks visible in both readings")
     return P, sigma, present, a
 
-def main(p1, p2, outdir, expression=None):
-    out = Path(outdir); out.mkdir(parents=True, exist_ok=True)
+def main(p1, p2, outdir, expression=None, *, reference_image, record=None, fixture=False):
+    identity, a, b = fit_inputs(reference_image, record, (p1, p2), fixture)
+    if expression is not None and expression != a["expression"]:
+        raise ValueError("requested expression differs from the landmark readings")
+    expression = a["expression"]
     names, _, _, _ = model(BASE, 'neutral')
-    P, sigma_px, present, meta = load_landmarks(p1, p2, names)
-    expression = expression or meta.get('expression', 'neutral')
+    P, sigma_px, present, meta = load_landmarks(a, b, names)
+    out = Path(outdir); out.mkdir(parents=True, exist_ok=True)
     theta0 = np.array([get(BASE, p[0]) for p in PARAMS])
     # Uniform weights over the marked landmarks. (1/sigma^2 weights, with sigma at the 2 px floor, make the objective ill-conditioned: the model's misfit is tens of px,
     # the marking noise 2-8 px. The noise is used to REPORT residuals in sigma units, and for the gates (ADR 0002 D8), not to weight the search.)
@@ -107,6 +114,7 @@ def main(p1, p2, outdir, expression=None):
     drawn = {p[0]: get(norm1, p[0]) for p in PARAMS}
     requested = {p[0]: float(v) for p, v in zip(PARAMS, theta)}
     result = {
+        **identity,
         'reference': meta['image'], 'expression': expression, 'nfev': n1, 'violations': viol1,
         'landmarks_used': [n for n, p in zip(names, present) if p], 'landmarks_missing': [n for n, p in zip(names, present) if not p],
         'sigma_px': {n: round(float(s), 1) for n, s, p in zip(names, sigma_px, present) if p},
@@ -120,9 +128,27 @@ def main(p1, p2, outdir, expression=None):
         'baseline_residual_px_by_landmark': {n: round(float(r), 1) for n, r, p in zip(names, r0, present) if p},
         'character': norm1,
     }
-    (out / 'fit.json').write_text(json.dumps(result, indent=2) + '\n')
+    fit_file = out / 'fit.json'
+    fit_file.write_text(json.dumps(result, indent=2) + '\n')
+    (out / 'derived.json').write_text(json.dumps({'derived': [{**identity, 'artifact': fit_file.name}]}, indent=2) + '\n')
     print(json.dumps({k: result[k] for k in ['expression', 'nfev', 'baseline_young_default', 'fitted', 'scale_px_per_model_unit', 'drawn_params', 'clamped_by', 'at_bound']}, indent=2))
     print('worst:', sorted(result['residual_px_by_landmark'].items(), key=lambda kv: -kv[1])[:6])
 
 if __name__ == '__main__':
-    main(*sys.argv[1:5])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("first", type=Path)
+    parser.add_argument("second", type=Path)
+    parser.add_argument("outdir", type=Path)
+    parser.add_argument("expression", nargs="?")
+    parser.add_argument("--reference-image", required=True, type=Path)
+    parser.add_argument("--record", type=Path)
+    parser.add_argument("--fixture", action="store_true")
+    args = parser.parse_args()
+    try:
+        main(args.first, args.second, args.outdir, args.expression,
+             reference_image=args.reference_image, record=args.record, fixture=args.fixture)
+    except ValidationError as error:
+        field = ".".join(str(part) for part in error.absolute_path) or "record"
+        parser.exit(2, f"Schema validation failed at {field} ({error.validator})\n")
+    except (OSError, KeyError, TypeError, ValueError) as error:
+        parser.exit(2, f"{error}\n")
