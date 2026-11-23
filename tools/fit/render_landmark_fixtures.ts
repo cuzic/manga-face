@@ -1,4 +1,5 @@
-import {readFile, readdir} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {readFile, readdir, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {chromium} from 'playwright-chromium';
 
@@ -13,7 +14,13 @@ try {
   for (const name of names) {
     const svg = await readFile(path.join(directory, name), 'utf8');
     await page.setContent('<style>body{margin:0}svg{display:block}</style>' + svg);
-    await page.screenshot({path: path.join(directory, name.replace(/\.svg$/, '.png'))});
+    const stem = path.join(directory, name.slice(0, -4));
+    const png = await page.screenshot({path: stem + '.png'});
+    const binding = {
+      svg_sha256: createHash('sha256').update(svg).digest('hex'),
+      png_sha256: createHash('sha256').update(png).digest('hex'),
+    };
+    await writeFile(stem + '.raster.json', JSON.stringify(binding) + '\n');
   }
 } finally {
   await browser.close();

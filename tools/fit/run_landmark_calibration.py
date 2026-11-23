@@ -1,6 +1,7 @@
 """Score independent vision-adapter readings against synthetic D4 fixtures."""
 import argparse
 import hashlib
+from io import BytesIO
 import json
 from pathlib import Path
 import subprocess
@@ -10,25 +11,40 @@ from PIL import Image
 import landmark_calibration as calibration
 import landmark_inference as runner
 
-def evaluate(fixtures, model, adapter, checkpoint):
-    checkpoint.mkdir(mode=0o700, exist_ok=True)
-    scores = []
-    seen = set()
+def checked_fixtures(fixtures, model):
+    inputs = []
     for name in ("neutral", "translated", "scaled-occluded"):
         svg = fixtures / f"{name}.svg"
         truth = json.loads(svg.with_suffix(".truth.json").read_text())
-        if hashlib.sha256(svg.read_bytes()).hexdigest() != truth["image_sha256"]:
+        png = svg.with_suffix(".png").read_bytes()
+        raster = {
+            "svg_sha256": hashlib.sha256(svg.read_bytes()).hexdigest(),
+            "png_sha256": hashlib.sha256(png).hexdigest(),
+        }
+        if raster["svg_sha256"] != truth["image_sha256"]:
             raise ValueError(f"fixture SVG changed: {name}")
-        with Image.open(svg.with_suffix(".png")) as image:
+        binding = json.loads(svg.with_suffix(".raster.json").read_text())
+        if binding != raster:
+            raise ValueError(f"fixture raster changed: {name}; render the fixtures again")
+        with Image.open(BytesIO(png)) as image:
             request = runner.make_request(image.convert("RGB"), runner.DEFINITIONS, model)
         if request["size"] != truth["size"]:
             raise ValueError(f"fixture raster dimensions changed: {name}")
+        inputs.append((name, truth, raster, request))
+    return inputs
+
+
+def evaluate(fixtures, model, adapter, checkpoint):
+    inputs = checked_fixtures(fixtures, model)
+    checkpoint.mkdir(mode=0o700, exist_ok=True)
+    scores = []
+    seen = set()
+    for name, truth, raster, request in inputs:
         for repeat in (1, 2):
             identity = {
                 "fixture": name, "pass": repeat, "model_version": model,
-                "png_sha256": hashlib.sha256(svg.with_suffix(".png").read_bytes()).hexdigest(),
+                **raster,
                 "prompt_sha256": hashlib.sha256(request["prompt"].encode()).hexdigest(),
-                "svg_sha256": truth["image_sha256"],
             }
             saved = checkpoint / f"{name}-{repeat}.json"
             if saved.exists():
