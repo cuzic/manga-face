@@ -109,8 +109,9 @@ def run_report(fixtures, model, adapter, output, cases, resume_invalid=False):
             prior = json.loads(old)
             if not resume_invalid or not prior.get("invalid_responses"):
                 raise ValueError("provide a new output path or explicitly resume an invalid report")
-            if prior["model_version"] != model:
-                raise ValueError("resumed report uses a different model")
+            previous_cases = [reading["fixture"] for reading in prior["readings"] if reading["pass"] == 1]
+            if prior["model_version"] != model or previous_cases != list(cases):
+                raise ValueError("resumed report uses a different model or fixture plan")
             archive = output.with_name(f"{output.stem}.superseded-{hashlib.sha256(old).hexdigest()}.json")
             if not archive.exists():
                 archive.hardlink_to(output)

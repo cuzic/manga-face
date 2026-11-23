@@ -30,9 +30,9 @@ OCCLUSION = '<path d="M88 82 Q108 53 137 68 Q152 81 144 114 L126 102 Q112 118 94
 
 BASE_CASES = ("neutral", "translated", "scaled-occluded")
 HAIR_CASES = {
-    "left-side-hidden": ('<path d="M52 82 Q96 52 140 66 Q142 86 139 102 L115 106 L105 135 Q96 156 61 165 Q62 130 52 82Z" fill="white"/>',
+    "left-side-hidden": ('<path d="M52 82 Q96 52 140 66 Q142 86 139 110 L115 108 L105 135 Q96 156 61 165 Q62 130 52 82Z" fill="white"/>',
                          {"cheekL", "earL", "eyeL_outer", "browL"}),
-    "right-side-hidden": ('<g transform="translate(320 0) scale(-1 1)"><path d="M52 82 Q96 52 140 66 Q142 86 139 102 L115 106 L105 135 Q96 156 61 165 Q62 130 52 82Z" fill="white"/></g>',
+    "right-side-hidden": ('<g transform="translate(320 0) scale(-1 1)"><path d="M52 82 Q96 52 140 66 Q142 86 139 110 L115 108 L105 135 Q96 156 61 165 Q62 130 52 82Z" fill="white"/></g>',
                           {"cheekR", "earR", "eyeR_outer", "browR"}),
 }
 
