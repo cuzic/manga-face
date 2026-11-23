@@ -28,18 +28,37 @@ FACE = '''<ellipse cx="80" cy="143" rx="11" ry="15" fill="white"/>
 OCCLUSION = '<path d="M100 92h41v15h-41z" fill="#151515"/>'
 
 
+BASE_CASES = ("neutral", "translated", "scaled-occluded")
+EXPRESSION_CASES = {
+    "smile": (
+        FACE.replace('M140 185h40', '')
+            + '<ellipse cx="160" cy="185" rx="23" ry="8" />',
+        {"mouthL": (137, 185), "mouthR": (183, 185)},
+    ),
+    "angry": (
+        FACE.replace('M107 100h26m54 0h26 M140 185h40',
+                     'M107 94l26 12 M187 106l26-12')
+            + '<ellipse cx="160" cy="185" rx="14" ry="3" />',
+        {"mouthL": (146, 185), "mouthR": (174, 185)},
+    ),
+}
+
+
 def generate(output):
     output.mkdir(parents=True, exist_ok=True)
     for name, scale, dx, dy, hidden in (
         ('neutral', 1, 0, 0, False),
         ('translated', 1, 36, 24, False),
         ('scaled-occluded', 1.25, 5, 16, True),
+        ('smile', 1, 15, 10, False),
+        ('angry', 1, 20, 18, False),
     ):
         cover = OCCLUSION if hidden else ''
-        svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="408" height="408" viewBox="0 0 408 408"><rect width="408" height="408" fill="white"/><g transform="translate({dx} {dy}) scale({scale})" fill="none" stroke="#151515" stroke-width="1">{FACE}{cover}</g></svg>\n'
+        face, changes = EXPRESSION_CASES.get(name, (FACE, {}))
+        svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="408" height="408" viewBox="0 0 408 408"><rect width="408" height="408" fill="white"/><g transform="translate({dx} {dy}) scale({scale})" fill="none" stroke="#151515" stroke-width="1">{face}{cover}</g></svg>\n'
         image = output / f'{name}.svg'
         image.write_text(svg)
-        points = {key: [x * scale + dx, y * scale + dy] for key, (x, y) in POINTS.items()
+        points = {key: [x * scale + dx, y * scale + dy] for key, (x, y) in (POINTS | changes).items()
                   if not (hidden and key == 'browL')}
         record = dict(image_sha256=hashlib.sha256(image.read_bytes()).hexdigest(),
                       size=[408, 408], points=points, missing=['browL'] if hidden else [])

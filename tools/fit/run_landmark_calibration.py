@@ -11,9 +11,9 @@ from PIL import Image
 import landmark_calibration as calibration
 import landmark_inference as runner
 
-def checked_fixtures(fixtures, model):
+def checked_fixtures(fixtures, model, cases):
     inputs = []
-    for name in ("neutral", "translated", "scaled-occluded"):
+    for name in cases:
         svg = fixtures / f"{name}.svg"
         truth = json.loads(svg.with_suffix(".truth.json").read_text())
         png = svg.with_suffix(".png").read_bytes()
@@ -34,8 +34,8 @@ def checked_fixtures(fixtures, model):
     return inputs
 
 
-def evaluate(fixtures, model, adapter, checkpoint):
-    inputs = checked_fixtures(fixtures, model)
+def evaluate(fixtures, model, adapter, checkpoint, cases=calibration.BASE_CASES):
+    inputs = checked_fixtures(fixtures, model, cases)
     checkpoint.mkdir(mode=0o700, exist_ok=True)
     scores = []
     seen = set()
@@ -80,13 +80,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fixtures", required=True, type=Path)
     parser.add_argument("--model", required=True)
+    parser.add_argument("--expanded", action="store_true", help="also read two expression fixtures (four extra calls)")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--adapter", required=True, nargs=argparse.REMAINDER)
     args = parser.parse_args()
     try:
         if not args.adapter or args.output.exists():
             raise ValueError("provide an adapter command and a new output path")
-        result = evaluate(args.fixtures, args.model, args.adapter, args.output.with_suffix(".checkpoint"))
+        cases = calibration.BASE_CASES + tuple(calibration.EXPRESSION_CASES) if args.expanded else calibration.BASE_CASES
+        result = evaluate(args.fixtures, args.model, args.adapter, args.output.with_suffix(".checkpoint"), cases)
         with args.output.open("x") as destination:
             json.dump(result, destination, indent=2, allow_nan=False)
             destination.write("\n")
