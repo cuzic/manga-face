@@ -6,7 +6,8 @@ from vision_checkpoint import digest
 
 OCCLUSION_REQUIRED = {"cheekL", "cheekR", "earL", "earR", "eyeL_outer", "eyeR_outer", "browL", "browR"}
 LIMITS = {"min_visible": 2, "min_detection": 0.9, "max_rms_px": 2, "max_zoom_px": 3, "min_occluded": 2}
-POLICY_VERSION = digest({"limits": LIMITS, "occlusion_required": sorted(OCCLUSION_REQUIRED)})
+# Increment logic when changing the rules independently of their numeric limits.
+POLICY_VERSION = digest({"logic": 3, "limits": LIMITS, "occlusion_required": sorted(OCCLUSION_REQUIRED)})
 
 
 def qualified_points(first, second, zoom, report):
@@ -15,7 +16,8 @@ def qualified_points(first, second, zoom, report):
     model = first["model_version"]
     configuration = first["sent_configuration_sha256"]
     if (len(configuration) != 64 or report["model_version"] != model
-            or second["model_version"] != model or second["sent_configuration_sha256"] != configuration):
+            or second["model_version"] != model or second["sent_configuration_sha256"] != configuration
+            or any(reading.get("source_size") != reading["size"] for reading in (first, second))):
         raise ValueError("fit needs two readings from the calibrated configuration")
     bound_fields = ("reference_id", "image_sha256", "record_sha256", "image", "size", "position", "origin", "expression")
     if (zoom.get("pass") != "zoom" or zoom.get("model_version") != model

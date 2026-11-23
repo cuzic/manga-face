@@ -210,7 +210,7 @@ class CheckpointAndPolicyTest(unittest.TestCase):
         from landmark_policy import qualified_points
 
         fields = dict(reference_id="id", image_sha256="image-hash", record_sha256="record-hash", image="sheet.png",
-                      size=[408, 408], position=0, origin=[0, 0], expression="neutral", model_version="model",
+                      size=[408, 408], source_size=[408, 408], position=0, origin=[0, 0], expression="neutral", model_version="model",
                       sent_configuration_sha256="a" * 64)
         points = {"chin": [100, 200], "noseTip": [100, 150], "browL": [80, 110]}
         a = {**fields, "pass": 1, "inference_id": "a", "points": points}
@@ -264,3 +264,20 @@ class CheckpointAndPolicyTest(unittest.TestCase):
             self.assertEqual(len(calls), 3)
             self.assertEqual(result["invalid_responses"], 0)
             self.assertEqual(len(list(root.glob("report.superseded-*.json"))), 1)
+
+    def test_resume_rejects_a_successful_report_or_a_changed_plan_without_dispatch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "report.json"
+            for invalid, model, cases in ((0, "model", ["neutral"]),
+                                          (1, "other", ["neutral"]),
+                                          (1, "model", ["translated"])):
+                with self.subTest(invalid=invalid, model=model, cases=cases):
+                    report = {"model_version": "model", "invalid_responses": invalid,
+                              "readings": [{"fixture": "neutral", "pass": 1}]}
+                    output.write_text(json.dumps(report))
+                    with patch.object(run_landmark_calibration, "evaluate") as evaluate:
+                        with self.assertRaises(ValueError):
+                            run_landmark_calibration.run_report(root, model, ["mock"], output, cases, resume_invalid=True)
+                        evaluate.assert_not_called()
+                    self.assertEqual(json.loads(output.read_text()), report)

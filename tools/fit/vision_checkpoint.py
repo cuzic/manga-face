@@ -14,7 +14,8 @@ def write_record(path, value):
     with tempfile.NamedTemporaryFile("w", dir=path.parent, delete=False) as file:
         pending = Path(file.name)
         try:
-            json.dump(value, file)
+            json.dump(value, file, indent=2, allow_nan=False)
+            file.write("\n")
             file.flush()
             pending.replace(path)
         finally:
