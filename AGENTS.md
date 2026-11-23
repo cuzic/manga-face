@@ -88,7 +88,7 @@ pnpm golden                                 # goldens/*.svg が再生成と 1 �
 
 | 場所 | 中身 |
 | --- | --- |
-| `src/` | ライブラリ(純粋)。`index.ts` が公開の入口。最初は `face.ts` 1 つ(スパイクの移動)で、U1 が分ける |
+| `src/` | ライブラリ(純粋)。`index.ts` が公開の入口。`face.ts` は U1 で分けたパラメータ・幾何・描画・検査・生成などのモジュールを再エクスポートする |
 | `test/` | `node --test`。`golden.test.ts`(goldens と一致)、`purity.test.ts`(純粋・tree-shaking)、`provenance.test.ts`(権利の記録) |
 | `tools/` | ギャラリー・見た目の方向・測定・golden・適合テストの道具(`pnpm gallery` / `pnpm measure` / `pnpm golden`)。ライブラリの一部ではない |
 | `goldens/` | 基準の絵(`tools/golden.ts` が作る。手で直さない) |

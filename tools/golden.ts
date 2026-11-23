@@ -2,7 +2,7 @@
 // Faces have no text, so no fonts are involved and the same bytes come out on every machine. Change a golden only for an intended change of the look.
 import fs from 'node:fs';
 import path from 'node:path';
-import {BOX, CHARACTERS, faceFragment, type Character} from '../src/face.ts';
+import {BOX, CHARACTERS, faceFragment, type Character} from '../src/index.ts';
 
 const dir = path.join(import.meta.dirname, '../goldens');
 const CELLS: readonly (readonly [string, Character, string])[] = [
