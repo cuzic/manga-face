@@ -1,0 +1,19 @@
+{
+  "file": "commons-surprising-face-2022.png",
+  "sha1": "3bebdda5c58157885bc56a8cd7142c372be88cdd",
+  "title": "Surprising face of manga 2022-08-30 (a generic hand-drawn line-art face with a surprised expression, 848x848, textured paper background)",
+  "author": "Asanagi (Wikimedia Commons user; uploaded as 'own work' with UploadWizard, 2022-08-30)",
+  "source": "Wikimedia Commons, File:Surprising face of manga 2022-08-30.png",
+  "source_url": "https://commons.wikimedia.org/wiki/File:Surprising_face_of_manga_2022-08-30.png",
+  "licence": "CC0 1.0 (the Commons page: {{self|cc-zero}}, LicenseShortName CC0, UsageTerms 'Creative Commons Zero, Public Domain Dedication', attribution not required)",
+  "licence_checked": "2026-11-23, by reading the Commons API metadata and wikitext of the file page",
+  "tier": "B: uploader-dedicated CC0 (not PD-old). Needs the second check below.",
+  "uploader_is_author_check": "plausible, not proven. The uploader has been a Commons contributor since 2010 (about 5,400 edits, autopatrolled) and uploads, as 'own work', both photographs and drawings (for example the file's category 'Emotions in anime and manga', and a hand-made animation); no source on the page claims a different author; the image is a crude generic sketch, not a known character. A reverse-image search was not possible in this environment.",
+  "depicts_real_person": false,
+  "resembles_known_character": false,
+  "kind": "reference-pd-cc0",
+  "used_for": "fit and eval (spike of docs/adr/0002). NOT for hair shipping (ADR 0002 D6: tier B sources need the second check and a person's resemblance review first, and a parametric redraw is preferred over shipping curves).",
+  "ai_generated": false,
+  "review": "a person (this PR's author, a language model reading the image) looked at it: a generic surprised face, not a real person, not a known character. A human reviewer (owner) must confirm before it is used for anything beyond this spike.",
+  "replaces": "an earlier spike reference (Open Clip Art 'Manga Boy'), removed because its Commons description says it depicts a real person (the author)"
+}

@@ -157,7 +157,7 @@ const resolveEye = (b: Base['eyes'], p: Preset['eye']): Eye => {
 type Pt = [number, number];
 type Seg = ['M', Pt] | ['L', Pt] | ['Q', Pt, Pt] | ['C', Pt, Pt, Pt] | ['Z'];
 const dOf = (segs: Seg[]): string => segs.map(s => s[0] + s.slice(1).map(p => `${n((p as Pt)[0])} ${n((p as Pt)[1])}`).join(' ')).join('');
-function flatten(segs: Seg[], steps = 10): Pt[] {
+export function flatten(segs: Seg[], steps = 10): Pt[] {
   const out: Pt[] = []; let cur: Pt = [0, 0];
   for (const s of segs) {
     if (s[0] === 'M' || s[0] === 'L') { cur = s[1]; out.push(cur); } else if (s[0] === 'Q') {
@@ -178,7 +178,7 @@ export function selfIntersects(poly: Pt[]): boolean {
 }
 
 // ---- the face outline: temple -> cheekbone -> jaw corner -> chin, mirrored (jaw roundness and chin width are independent)
-function faceSegs(h: Base['head']): Seg[] {
+export function faceSegs(h: Base['head']): Seg[] {
   const W = h.cheek, H = h.chin, j = h.jaw, cw = h.chinW;
   const jx = cw + (W * 0.8 - cw) * j, jy = H * (0.6 + 0.2 * j);
   const half = (s: -1 | 1) => ({
@@ -193,7 +193,7 @@ function faceSegs(h: Base['head']): Seg[] {
   ];
 }
 /** Half the face width at height y (from the flattened outline). */
-function faceHalfWidth(poly: Pt[], y: number): number {
+export function faceHalfWidth(poly: Pt[], y: number): number {
   let best = 0;
   for (let i = 0; i < poly.length; i++) { const a = poly[i]!, b = poly[(i + 1) % poly.length]!; if ((a[1] - y) * (b[1] - y) <= 0 && a[1] !== b[1]) { const x = a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]); best = Math.max(best, Math.abs(x - CX)); } }
   return best;
@@ -357,6 +357,8 @@ function hairParts(h: Base['hair'], W: number, hairHex: string): Hair {
 export interface FragmentOpts {
   /** false: leave out the nose, eyes, brows, mouth and blush; 'lines': only the line features (nose, brows, mouth, and the `^^` `><` dot eyes). The pixel tests compare with and without them. */
   features?: boolean | 'lines';
+  /** false: leave out the hair (the back hair, the mass, the locks, the ahoge); the fitting tools (tools/fit) compare the face without it */
+  hair?: boolean;
   /** draw the feature lines without their paper keyline (a negative control for the pixel tests) */
   noFeatureKeyline?: boolean;
   /** leave out one boundary keyline (the pixel tests check that each one changes the picture) */
@@ -389,7 +391,8 @@ export function faceFragment(chIn: Character, expression: string, opts: Fragment
   const neck = `<clipPath id="nk"><path d="${neckD}"/></clipPath><path d="${neckD}" fill="${skin}"/>${over(`path d="${neckD}"`, SHADE_ROSE, 0.28)}<path d="${neckD}" ${ink46}/>`
     + (opts.noKeyline === 'faceNeck' ? '' : `<g clip-path="url(#nk)"><path d="${face}" fill="none" stroke="${PAPER}" stroke-width="8.6"/></g>`);
   const ears = [-1, 1].map(s => `<ellipse cx="${CX + s * W}" cy="${CY + 14}" rx="9" ry="15" fill="${skin}" stroke="${INK}" stroke-width="4"/>`).join('');
-  const faceFill = `<clipPath id="fc"><path d="${face}"/></clipPath><path d="${face}" fill="${skin}"/><g clip-path="url(#fc)">${hair.skinShade}</g><path d="${face}" ${ink46}/>`;
+  const HR = opts.hair !== false;
+  const faceFill = `<clipPath id="fc"><path d="${face}"/></clipPath><path d="${face}" fill="${skin}"/><g clip-path="url(#fc)">${HR ? hair.skinShade : ''}</g><path d="${face}" ${ink46}/>`;
   const F = opts.features !== false, lines = opts.features === 'lines';
   const nose = !F || ch.nose === 'none' ? '' : ch.nose === 'dot' ? inkLine(`M${CX - 3} ${CY + 44}q3 4 6 0`, 3.2, keyed) : inkLine(`M${CX - 2} ${CY + 38}l-3 8l6 0`, 3.2, keyed);
   const blush = F && !lines && pr.blush ? [-1, 1].map(s => [0, 1, 2].map(i => `<path d="M${n(CX + s * (W - 34) + i * 7 - 8)} ${CY + 54}l6 -10" fill="none" stroke="${BLUSH}" stroke-opacity="0.65" stroke-width="3" stroke-linecap="round"/>`).join('')).join('') : '';
@@ -400,7 +403,7 @@ export function faceFragment(chIn: Character, expression: string, opts: Fragment
   const keyHair = opts.noKeyline === 'hairFace' ? '' : `<clipPath id="kc"><path d="${face}"/></clipPath><g clip-path="url(#kc)" fill="none" stroke="${PAPER}" stroke-width="8.6" stroke-linejoin="round">${hair.lockStroke}</g>`;
   const lineEye = lines && !['arc', 'arcDown', 'cross', 'dot'].includes(eye.kind);
   const feat = nose + (lineEye ? '' : eL.svg + eR.svg) + mo.svg;
-  const inner = hair.back + body + neck + ears + faceFill + blush + keyHair + hair.clipDefs + hair.mass + hair.locks + hair.lockShade + (F ? feat : '')
+  const inner = (HR ? hair.back : '') + body + neck + ears + faceFill + blush + (HR ? keyHair + hair.clipDefs + hair.mass + hair.locks + hair.lockShade : '') + (F ? feat : '')
     // brows last: above the fringe (the see-through brow), in ink
     + (F ? bL.svg + bR.svg : '');
   const fragment = ch.mirror ? `<g transform="translate(300 0) scale(-1 1)">${inner}</g>` : inner;

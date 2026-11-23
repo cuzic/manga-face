@@ -1,6 +1,8 @@
-"""Vectorizes the dark layer (ink and black hair) and the silhouette of a reference with potrace's algorithm (the pure-Python port `potracer`).
-usage: python tools/fit/vectorize.py <ref.png> <outdir>
+"""Vectorizes the dark layer (ink lines) and the silhouette of a reference with potrace's algorithm (the pure-Python port `potracer`).
+usage: python tools/fit/vectorize.py <ref.png> <outdir> [ink_threshold=140]
 The result is a measurement and an input to later steps (ADR 0002 D3); a traced shape ships only under the rule of ADR 0002 D6.
+Note: potrace outlines FILLED shapes, so a drawn line of width w comes out as one closed contour around the stroke (two edges). For line-art references the
+vectorized outline is therefore used for the hair silhouette and as the ink mask of the distance measure (ADR 0002 D5), not as a centre line.
 """
 import sys, json, hashlib
 from pathlib import Path
@@ -32,12 +34,12 @@ def to_svg_path(plist):
 def count_nodes(plist):
     return sum(len(c.segments) for c in plist)
 
-def main(ref, outdir):
+def main(ref, outdir, thr=140):
     out = Path(outdir); out.mkdir(parents=True, exist_ok=True)
     gray, alpha = load(ref)
     h, w = gray.shape
     stats = {}
-    for name, mask in (('ink', gray < 80), ('silhouette', alpha > 128)):
+    for name, mask in (('ink', gray < thr), ('silhouette', alpha > 128)):
         pl = trace(mask)
         d = to_svg_path(pl)
         svg = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}"><rect width="{w}" height="{h}" fill="#ffffff"/><path d="{d}" fill="#22201b" fill-rule="evenodd"/></svg>\n'
@@ -47,4 +49,4 @@ def main(ref, outdir):
     print(json.dumps(stats, indent=2))
 
 if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], int(sys.argv[3]) if len(sys.argv) > 3 else 140)

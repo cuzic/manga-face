@@ -1,110 +1,157 @@
 {
-  "reference": "openclipart-25619-manga-boy.png",
-  "unit": "model units (the head circle has r = 100)",
-  "nfev": 63,
-  "cost": 216.40393917059623,
+  "reference": "commons-surprising-face-2022.png",
+  "expression": "surprise",
+  "nfev": 69,
+  "violations": [],
+  "landmarks_used": [
+    "chin",
+    "cheekR",
+    "eyeL_outer",
+    "eyeL_inner",
+    "eyeL_top",
+    "eyeL_bottom",
+    "eyeR_inner",
+    "eyeR_outer",
+    "eyeR_top",
+    "eyeR_bottom",
+    "browL",
+    "browR",
+    "mouthL",
+    "mouthR",
+    "mouthC"
+  ],
+  "landmarks_missing": [
+    "cheekL",
+    "earL",
+    "earR",
+    "noseTip"
+  ],
+  "sigma_px": {
+    "chin": 2.0,
+    "cheekR": 2.0,
+    "eyeL_outer": 2.5,
+    "eyeL_inner": 2.0,
+    "eyeL_top": 2.5,
+    "eyeL_bottom": 2.5,
+    "eyeR_inner": 2.0,
+    "eyeR_outer": 2.7,
+    "eyeR_top": 2.0,
+    "eyeR_bottom": 2.5,
+    "browL": 7.5,
+    "browR": 2.0,
+    "mouthL": 2.0,
+    "mouthR": 2.0,
+    "mouthC": 2.0
+  },
   "baseline_young_default": {
-    "rms": 11.031491258404184,
-    "max": 16.30447916856704,
-    "argmax": "mouthL"
+    "rms_px": 71.26505016346427,
+    "max_px": 158.78056290646242,
+    "argmax": "mouthL",
+    "rms_in_sigma": 32.51039211713969,
+    "rms_model_units": 22.65746999889214
   },
   "fitted": {
-    "rms": 5.340694827446281,
-    "max": 11.469869956586315,
-    "argmax": "earL"
+    "rms_px": 51.34272876439867,
+    "max_px": 122.34257538614538,
+    "argmax": "mouthL",
+    "rms_in_sigma": 24.049989069166575,
+    "rms_model_units": 16.32351810561148
   },
   "map": {
-    "s": 0.31310864269966654,
-    "tx": 28.485543026409644,
-    "ty": 3.6127987474969245
+    "s": 0.3179324219504729,
+    "tx": -1.5494146143825844,
+    "ty": 15.837850605389235
   },
-  "params": {
-    "head.cheek": 74.0,
+  "scale_px_per_model_unit": 3.145322499244128,
+  "drawn_params": {
+    "head.cheek": 88.0,
     "head.chin": 98.0,
-    "eyes.w": 25.0,
+    "eyes.w": 20.0,
     "eyes.h": 13.0,
     "eyes.y": 14.0,
-    "eyes.gap": 42.0,
-    "brows.dy": 5.0,
+    "eyes.gap": 36.0,
+    "brows.dy": 3.0,
     "mouth.w": 47.0,
-    "mouth.y": 66.0
+    "mouth.y": 61.0
   },
+  "requested_params": {
+    "head.cheek": 88.0,
+    "head.chin": 98.0,
+    "eyes.w": 20.0,
+    "eyes.h": 13.0,
+    "eyes.y": 14.0,
+    "eyes.gap": 36.0,
+    "brows.dy": 3.0,
+    "mouth.w": 47.0,
+    "mouth.y": 61.0
+  },
+  "clamped_by": {},
   "at_bound": [
-    "head.cheek",
     "head.chin",
     "eyes.h",
-    "eyes.y"
+    "eyes.y",
+    "eyes.gap"
   ],
-  "residual_by_landmark": {
-    "chin": 5.5,
-    "cheekL": 8.6,
-    "cheekR": 10.0,
-    "earL": 11.5,
-    "earR": 6.2,
-    "eyeL_outer": 2.7,
-    "eyeL_inner": 6.6,
-    "eyeL_top": 3.6,
-    "eyeL_bottom": 3.2,
-    "eyeR_inner": 4.3,
-    "eyeR_outer": 3.4,
-    "eyeR_top": 2.0,
-    "eyeR_bottom": 0.8,
-    "browL": 2.7,
-    "browR": 4.6,
-    "noseTip": 5.9,
-    "mouthL": 4.4,
-    "mouthR": 1.0,
-    "mouthC": 2.0,
-    "crown": 0.8
-  },
-  "baseline_residual_by_landmark": {
-    "chin": 14.2,
-    "cheekL": 11.8,
-    "cheekR": 14.6,
-    "earL": 12.1,
-    "earR": 10.0,
-    "eyeL_outer": 11.4,
-    "eyeL_inner": 9.8,
-    "eyeL_top": 6.4,
-    "eyeL_bottom": 12.9,
+  "residual_px_by_landmark": {
+    "chin": 25.3,
+    "cheekR": 58.6,
+    "eyeL_outer": 35.8,
+    "eyeL_inner": 34.8,
+    "eyeL_top": 24.2,
+    "eyeL_bottom": 25.3,
     "eyeR_inner": 9.8,
-    "eyeR_outer": 11.0,
-    "eyeR_top": 4.8,
-    "eyeR_bottom": 12.2,
-    "browL": 9.1,
-    "browR": 8.9,
-    "noseTip": 8.4,
-    "mouthL": 16.3,
-    "mouthR": 13.0,
-    "mouthC": 7.0,
-    "crown": 9.8
+    "eyeR_outer": 34.7,
+    "eyeR_top": 19.9,
+    "eyeR_bottom": 20.0,
+    "browL": 59.0,
+    "browR": 36.4,
+    "mouthL": 122.3,
+    "mouthR": 98.1,
+    "mouthC": 15.8
+  },
+  "baseline_residual_px_by_landmark": {
+    "chin": 25.9,
+    "cheekR": 42.4,
+    "eyeL_outer": 63.8,
+    "eyeL_inner": 43.0,
+    "eyeL_top": 40.5,
+    "eyeL_bottom": 56.5,
+    "eyeR_inner": 21.4,
+    "eyeR_outer": 64.5,
+    "eyeR_top": 41.2,
+    "eyeR_bottom": 55.6,
+    "browL": 83.9,
+    "browR": 59.5,
+    "mouthL": 158.8,
+    "mouthR": 131.9,
+    "mouthC": 19.6
   },
   "character": {
     "id": "fit",
     "name": "fit",
     "head": {
-      "cheek": 74.0,
-      "chin": 98.0,
+      "cheek": 88,
+      "chin": 98,
       "jaw": 0.65,
       "chinW": 4
     },
     "eyes": {
-      "w": 25.0,
-      "h": 13.0,
+      "w": 20,
+      "h": 13,
       "tilt": 0,
       "iris": 1,
-      "y": 14.0,
-      "gap": 42.0,
+      "y": 14,
+      "gap": 36,
       "lashes": true,
       "lidW": 7
     },
     "brows": {
       "thick": 6,
-      "dy": 5.0
+      "dy": 3
     },
     "mouth": {
-      "w": 47.0,
-      "y": 66.0
+      "w": 47,
+      "y": 61
     },
     "nose": "dot",
     "hair": {
@@ -122,15 +169,22 @@
       "iris": "blue"
     }
   },
-  "appearance_chamfer": {
+  "appearance_distance_to_ink": {
     "box": [
-      200,
-      400,
-      580,
-      790
+      215,
+      300,
+      730,
+      700
     ],
-    "unit": "px of the 720x800 reference; the head is about 440 px wide",
-    "chamfer_baseline": 19.926901205437225,
-    "chamfer_fit": 9.720800585507861
+    "unit": "px of the reference (the face is about 500 px wide); distance to the ink mask both ways, mean, inside the box",
+    "ref_ink_pixels_in_box": 16652,
+    "base_ref_to_model_px": 23.609042349988243,
+    "base_model_to_ref_px": 19.011167826824128,
+    "base_symmetric_px": 21.310105088406186,
+    "base_pct_of_face_width": 4.262021017681237,
+    "fit_ref_to_model_px": 19.602383744826454,
+    "fit_model_to_ref_px": 17.751712121558,
+    "fit_symmetric_px": 18.677047933192227,
+    "fit_pct_of_face_width": 3.7354095866384456
   }
 }
