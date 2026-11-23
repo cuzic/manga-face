@@ -82,3 +82,33 @@ class ReferenceRecordTest(unittest.TestCase):
                 second.write_text(json.dumps({**second_record, key: value}))
                 with self.assertRaises(ValueError):
                     reference_record.fit_inputs(self.image, None, (first, second))
+
+    def test_review_preserves_draft_and_accepts_both_r1_expression_sheets(self):
+        from datetime import date
+        from types import SimpleNamespace
+        from generate import EXPRESSIONS
+        from review_reference import list_pending, review
+
+        for index, expressions in enumerate(EXPRESSIONS):
+            with self.subTest(expressions=expressions):
+                draft = self.image.with_name(f"r1-{index}.provenance.json")
+                output = self.image.with_name(f"reviewed-{index}.json")
+                data = {**self.data, "id": f"sheet-{index + 1}", "review": "pending",
+                        "domain_candidate": "young",
+                        "cells": [{"position": n, "expression": e} for n, e in enumerate(expressions)]}
+                for field in ("domain", "reviewer", "reviewed_at"):
+                    del data[field]
+                draft_bytes = json.dumps(data).encode()
+                draft.write_bytes(draft_bytes)
+                self.assertIn(draft.name, [entry["file"] for entry in list_pending(draft.parent)])
+                args = SimpleNamespace(id=f"ai-{index + 1:04d}", decision="accepted", reviewer="owner",
+                                       reviewed_at=date(2026, 11, 23), domain=None, reason=None,
+                                       out_reason=None, out_reason_detail=None, discard_cell=[(2, "quality")])
+                review(self.image, draft, output, args)
+                self.assertEqual(draft.read_bytes(), draft_bytes)
+                reviewed = json.loads(output.read_text())
+                self.assertEqual(reviewed["domain"], "young")
+                self.assertEqual(reviewed["cells"][2]["review"], "discarded")
+                self.assertEqual(reviewed["cells"][2]["reason"], "quality")
+                with self.assertRaises(FileExistsError):
+                    review(self.image, draft, output, args)

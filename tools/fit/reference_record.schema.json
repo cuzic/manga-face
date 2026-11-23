@@ -135,13 +135,9 @@
       "allOf": [
         {
           "contains": {
-            "type": "object",
             "properties": {
               "position": {
                 "const": 0
-              },
-              "expression": {
-                "const": "neutral"
               }
             }
           },
@@ -150,13 +146,9 @@
         },
         {
           "contains": {
-            "type": "object",
             "properties": {
               "position": {
                 "const": 1
-              },
-              "expression": {
-                "const": "smile"
               }
             }
           },
@@ -165,13 +157,9 @@
         },
         {
           "contains": {
-            "type": "object",
             "properties": {
               "position": {
                 "const": 2
-              },
-              "expression": {
-                "const": "surprise"
               }
             }
           },
@@ -180,18 +168,108 @@
         },
         {
           "contains": {
-            "type": "object",
             "properties": {
               "position": {
                 "const": 3
-              },
-              "expression": {
-                "const": "angry"
               }
             }
           },
           "minContains": 0,
           "maxContains": 1
+        }
+      ],
+      "anyOf": [
+        {
+          "items": {
+            "anyOf": [
+              {
+                "properties": {
+                  "position": {
+                    "const": 0
+                  },
+                  "expression": {
+                    "const": "neutral"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "position": {
+                    "const": 1
+                  },
+                  "expression": {
+                    "const": "smile"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "position": {
+                    "const": 2
+                  },
+                  "expression": {
+                    "const": "surprise"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "position": {
+                    "const": 3
+                  },
+                  "expression": {
+                    "const": "angry"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "items": {
+            "anyOf": [
+              {
+                "properties": {
+                  "position": {
+                    "const": 0
+                  },
+                  "expression": {
+                    "const": "neutral"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "position": {
+                    "const": 1
+                  },
+                  "expression": {
+                    "const": "laugh"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "position": {
+                    "const": 2
+                  },
+                  "expression": {
+                    "const": "worry"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "position": {
+                    "const": 3
+                  },
+                  "expression": {
+                    "const": "sad"
+                  }
+                }
+              }
+            ]
+          }
         }
       ]
     }
@@ -212,10 +290,13 @@
         },
         "expression": {
           "enum": [
+            "angry",
+            "laugh",
             "neutral",
+            "sad",
             "smile",
             "surprise",
-            "angry"
+            "worry"
           ]
         },
         "review": {
@@ -254,82 +335,6 @@
             "required": [
               "reason"
             ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "position": {
-                "const": 0
-              }
-            },
-            "required": [
-              "position"
-            ]
-          },
-          "then": {
-            "properties": {
-              "expression": {
-                "const": "neutral"
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "position": {
-                "const": 1
-              }
-            },
-            "required": [
-              "position"
-            ]
-          },
-          "then": {
-            "properties": {
-              "expression": {
-                "const": "smile"
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "position": {
-                "const": 2
-              }
-            },
-            "required": [
-              "position"
-            ]
-          },
-          "then": {
-            "properties": {
-              "expression": {
-                "const": "surprise"
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "position": {
-                "const": 3
-              }
-            },
-            "required": [
-              "position"
-            ]
-          },
-          "then": {
-            "properties": {
-              "expression": {
-                "const": "angry"
-              }
-            }
           }
         }
       ]

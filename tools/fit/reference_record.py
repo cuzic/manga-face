@@ -18,11 +18,15 @@ PUBLIC_ID = re.compile(r"ai-[0-9]{4,}")
 SCHEMA = Path(__file__).with_name("reference_record.schema.json")
 
 
-def validate(image, raw_record, fixture=False, for_fit=False):
-    data = json.loads(raw_record)
+def validate_schema(data):
     schema = json.loads(SCHEMA.read_text())
     validator = Draft202012Validator(schema, format_checker=Draft202012Validator.FORMAT_CHECKER)
     validator.validate(data)
+
+
+def validate(image, raw_record, fixture=False, for_fit=False):
+    data = json.loads(raw_record)
+    validate_schema(data)
     if data["review"] != "accepted":
         raise ValueError("reference needs an owner acceptance record")
     kind, domain = data["kind"], data["domain"]
