@@ -28,8 +28,16 @@ pnpm install
 pnpm typecheck && pnpm lint && pnpm test
 pnpm golden          # compare goldens/*.svg with a rebuild (pnpm golden:write after an intended change of the look)
 pnpm gallery         # out/gallery.svg, out/extras.svg, out/directions.svg
-pnpm measure         # needs playwright-chromium's browser: determinism in Chromium, stage-scale distinguishability, pixel checks
+pnpm measure --check # needs Playwright Chromium. Writes out/measurements.json and fails if a check fails.
+node tools/stage.ts  # out/stage.svg at stage size and 2×
+node tools/blind.ts "$BLIND_QUIZ_SEED"  # out/blind.html and the organizer's out/blind-key.json
 ```
+
+`pnpm measure --check` checks stage-scale distinguishability and pixels, top anchors, minimum stroke width, determinism, sampler validity, the comic sample, and compatibility when replacing built-in faces. The pixel grid covers young short hair, mirrored young bob, and mature, each with every named skin and hair colour.
+
+For each stage-size blind review, the organizer chooses a fresh unsigned 32-bit integer seed and passes it to `tools/blind.ts`. Each card draws an expression independently, so an expression can repeat. Share only `blind.html` with reviewers. Keep `blind-key.json` with the organizer, who loads it after all cards have been answered.
+
+When the organizer supplies the `BLIND_QUIZ_SEED` Actions secret, CI publishes `blind.html` in `blind-quiz`. Reviewers should download only `blind-quiz`. To score that quiz, the organizer generates the key locally from the same commit, the run's `measurements.json`, and the same seed.
 
 Work is done by agents from task specs (Issues titled `[codex] …`): see `AGENTS.md`.
 

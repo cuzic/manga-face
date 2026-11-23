@@ -45,12 +45,10 @@ jobs:
         with:
           name: gallery
           path: out/*.svg
-  # The measurements (determinism in Chromium, anchors by raster, distinguishability at stage scale, the pixel checks) need a browser. Not a required check
-  # while the thresholds are being settled; its numbers are in the artifact.
+  # D7 stage and pixel checks run in Chromium. Keep the numbers even if a threshold fails.
   measure:
     name: measure (chromium)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -59,9 +57,45 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Playwright Chromium 1.62.1 pins Chromium 151.0.7922.34. Re-run the D7 measurements on upgrades:
+      # the showcase minimum is 6.055 against a floor of 6.
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm measure
+      - run: pnpm measure --check
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: measurements
           path: out/measurements.json
+      - run: node tools/stage.ts
+      - name: generate blind quiz with the organizer's seed
+        id: blind
+        env:
+          BLIND_QUIZ_SEED: ${{ secrets.BLIND_QUIZ_SEED }}
+        run: |
+          if [[ -n "$BLIND_QUIZ_SEED" ]]; then
+            node tools/blind.ts "$BLIND_QUIZ_SEED"
+            echo "generated=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: render before and after brow crops
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          baseline=$(mktemp -d)
+          git fetch --depth=1 origin "$PR_BASE"
+          git archive "$PR_BASE" src | tar -x -C "$baseline"
+          node tools/brow-comparison.ts "$baseline/src/index.ts"
+          node tools/png.mjs out/brows-before.svg out/brows-before.png
+          node tools/png.mjs out/brows-after.svg out/brows-after.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stage-review
+          path: |
+            out/stage.svg
+            out/brows-*.png
+      - uses: actions/upload-artifact@v4
+        if: steps.blind.outputs.generated == 'true'
+        with:
+          name: blind-quiz
+          path: out/blind.html
+          if-no-files-found: error

@@ -1,10 +1,15 @@
-import {PRESETS, browSvg, eyeSvg, mouthSvg, noseSvg, resolveEye} from './features.ts';
-import type {Built} from './features.ts';
+import {browKeyline, browSvg} from './brows.ts';
+import {eyeSvg, resolveEye} from './eyes.ts';
+import type {Built} from './eyes.ts';
 import {CX, CY, dOf, faceSegs, n} from './geometry.ts';
 import {hairParts} from './hair.ts';
+import {mouthSvg, noseSvg} from './mouths.ts';
 import {BLUSH, HAIR, INK, IRIS, MOUTH_IN, PAPER, SHADE_ROSE, SKIN, TONGUE, TOP, WHITE, needsKeyline, nudge, over, pick} from './palette.ts';
 import {normalize} from './params.ts';
 import type {Character} from './params.ts';
+import {PRESETS} from './presets.ts';
+
+const FRINGE_KEYLINE = 8.6;
 
 export interface FragmentOpts {
   /** false: leave out the nose, eyes, brows, mouth and blush; 'lines': only the line features (nose, brows, mouth, and the `^^` `><` dot eyes). The pixel tests compare with and without them. */
@@ -30,8 +35,6 @@ export function faceFragmentRaw(ch: Character, expression: string, opts: Fragmen
   const topHex = nudge(pick(TOP, ch.palette.top), taken); taken.add(topHex);
   const iris = nudge(pick(IRIS, ch.palette.iris), taken);
   const keyed = needsKeyline(skin) && !opts.noFeatureKeyline;
-  // brows lie on the fringe, so they are keyed when the hair is dark (ink under 3:1 against it) as well as on a dark skin
-  const browKeyed = !opts.noFeatureKeyline && (needsKeyline(skin) || needsKeyline(hairHex));
   const W = ch.head.cheek;
   const face = dOf(faceSegs(ch.head));
   const eye = resolveEye(ch.eyes, pr.eye);
@@ -50,15 +53,19 @@ export function faceFragmentRaw(ch: Character, expression: string, opts: Fragmen
   const nose = F ? noseSvg(ch.nose, keyed) : '';
   const blush = F && !lines && pr.blush ? [-1, 1].map(s => [0, 1, 2].map(i => `<path d="M${n(CX + s * (W - 34) + i * 7 - 8)} ${CY + 54}l6 -10" fill="none" stroke="${BLUSH}" stroke-opacity="0.65" stroke-width="3" stroke-linecap="round"/>`).join('')).join('') : '';
   const eL = eyeSvg(eye, -1, CX - gap, eyeY, iris, 'el', keyed), eR = eyeSvg(eye, 1, CX + gap, eyeY, iris, 'er', keyed);
-  const bL = browSvg(pr.brow, ch.brows.thick, -1, CX - gap, eyeY, ch.eyes.h, ch.brows.dy, browKeyed), bR = browSvg(pr.brow, ch.brows.thick, 1, CX + gap, eyeY, ch.eyes.h, ch.brows.dy, browKeyed);
+  const bL = browSvg(pr.brow, ch.brows.thick, -1, CX - gap, eyeY, ch.eyes.h, ch.brows.dy), bR = browSvg(pr.brow, ch.brows.thick, 1, CX + gap, eyeY, ch.eyes.h, ch.brows.dy);
   const mo = mouthSvg(pr.mouth, ch.mouth.w, mouthY, 'mo', keyed);
   // hair-face keyline: the edge of the mass and of every lock, on the face's side (paper | ink); the hair's own side is dark and has the ink line alone
-  const keyHair = opts.noKeyline === 'hairFace' ? '' : `<clipPath id="kc"><path d="${face}"/></clipPath><g clip-path="url(#kc)" fill="none" stroke="${PAPER}" stroke-width="8.6" stroke-linejoin="round">${hair.lockStroke}</g>`;
+  const keyHair = opts.noKeyline === 'hairFace' ? '' : `<clipPath id="kc"><path d="${face}"/></clipPath><g clip-path="url(#kc)" fill="none" stroke="${PAPER}" stroke-width="${FRINGE_KEYLINE}" stroke-linejoin="round">${hair.lockStroke}</g>`;
   const lineEye = lines && !['arc', 'arcDown', 'cross', 'dot'].includes(eye.kind);
   const feat = nose + (lineEye ? '' : eL.svg + eR.svg) + mo.svg;
-  const inner = hair.back + body + neck + ears + faceFill + blush + keyHair + hair.clipDefs + hair.mass + hair.locks + hair.lockShade + (F ? feat : '')
-    // brows last: above the fringe (the see-through brow), in ink
-    + (F ? bL.svg + bR.svg : '');
+  // The hair covers the skin-side brow underlay. The hair-side underlay follows the fringe width and stays inside the mass and locks.
+  const skinBrowKey = F && keyed ? `<g clip-path="url(#fc)">${browKeyline(bL.path)}${browKeyline(bR.path)}</g>` : '';
+  const hairBrowKey = F && !opts.noFeatureKeyline && needsKeyline(hairHex)
+    ? `<clipPath id="bk">${hair.lockStroke}</clipPath><g clip-path="url(#bk)">${browKeyline(bL.path, FRINGE_KEYLINE)}${browKeyline(bR.path, FRINGE_KEYLINE)}</g>`
+    : '';
+  const inner = hair.back + body + neck + ears + faceFill + blush + keyHair + skinBrowKey
+    + hair.clipDefs + hair.mass + hair.locks + hair.lockShade + (F ? feat + hairBrowKey + bL.built.svg + bR.built.svg : '');
   const fragment = ch.mirror ? `<g transform="translate(300 0) scale(-1 1)">${inner}</g>` : inner;
-  return {fragment, top: n(hair.top), features: {eyes: [eL, eR], brows: [bL, bR], mouth: mo}};
+  return {fragment, top: n(hair.top), features: {eyes: [eL, eR], brows: [bL.built, bR.built], mouth: mo}};
 }
