@@ -15,6 +15,8 @@ import tempfile
 
 from PIL import Image
 
+from generate import EXPRESSIONS
+
 DEFINITIONS = {
     "chin": "Lowest point of the face outline.",
     "cheekL": "Image-left face edge at eye line + 20% of the way to the chin.",
@@ -75,18 +77,19 @@ def checked_cells(record, prepared):
             or any(record[field] != prepared[field] for field in ("kind", "domain"))):
         raise ValueError("the prepared reference requires matching, accepted AI provenance")
     width, height = prepared["cell_size"]
-    expressions = ("neutral", "smile", "surprise", "angry")
     accepted = {}
-    reviewed = set()
+    reviewed = {}
     for item in record["cells"]:
         position = item["position"]
-        if (type(position) is not int or not 0 <= position < len(expressions)
-                or position in reviewed or item["expression"] != expressions[position]
+        if (type(position) is not int or not 0 <= position < len(EXPRESSIONS[0])
+                or position in reviewed
                 or item["review"] not in {"accepted", "discarded"}):
             raise ValueError("invalid reviewed cell")
-        reviewed.add(position)
+        reviewed[position] = item["expression"]
         if item["review"] == "accepted":
             accepted[position] = item["expression"]
+    if not any(all(group[position] == expr for position, expr in reviewed.items()) for group in EXPRESSIONS):
+        raise ValueError("reviewed cells do not match an R1 expression sheet")
     used = set()
     for cell in prepared["cells"]:
         position = cell["position"]

@@ -113,3 +113,19 @@ class CalibrationTest(unittest.TestCase):
             scores = landmark_calibration.score(truth, {**truth, "points": points, "missing": []})
             self.assertEqual(scores["false_positive_on_occluded"], ["browL"])
             self.assertGreater(scores["error_px"]["chin"], 3)
+
+
+class SheetLayoutTest(unittest.TestCase):
+    def test_accepts_both_r1_layouts_and_rejects_a_mixed_sheet(self):
+        from generate import EXPRESSIONS
+
+        for expressions in EXPRESSIONS:
+            cells = [{"position": i, "expression": e, "review": "accepted", "origin": [i % 2 * 16, i // 2 * 16]}
+                     for i, e in enumerate(expressions)]
+            record = {"id": "synthetic", "review": "accepted", "kind": "ai-generated", "domain": "young", "cells": cells}
+            prepared = {"reference_id": "synthetic", "kind": "ai-generated", "domain": "young",
+                        "cell_size": [16, 16], "cells": cells}
+            self.assertEqual(landmark_inference.checked_cells(record, prepared), cells)
+        cells[1]["expression"] = "smile"
+        with self.assertRaisesRegex(ValueError, "R1 expression sheet"):
+            landmark_inference.checked_cells(record, prepared)
