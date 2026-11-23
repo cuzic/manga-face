@@ -18,3 +18,13 @@ A part is a face outline, an eye kind, a brow, a mouth kind, a nose, a hair temp
 | body, neck, ears (`src/fragment.ts` · `faceFragment`) | coding assistant (Claude) for the owner | 2026-11-22 | geometry written as code | none | owner checkpoint (U2) |
 
 "Method" is one of: *by a person as code*, *by a coding assistant as code*. Anything else (a generative model's drawing, a trace, a reference-matched adjustment) is not allowed in v1.
+
+## References (ADR 0002; not shipped as art)
+
+References are used for fitting and evaluation only. The shipped art is always our code redrawing from parameters. **Generative-model images are not kept in this repository** (a private store; see ADR 0002 D6/D9); only a row per image (hash, result) will be listed here once the ADR is accepted and generation has started. No generated image exists yet.
+
+| Id | Kind | Source / model | Date | Licence | Hash (sha1 / sha256) | Review | Used for |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| commons-surprising-face-2022 | pd-cc0 (tier B: uploader-dedicated CC0) | Wikimedia Commons `File:Surprising face of manga 2022-08-30.png` by Asanagi (own work), https://commons.wikimedia.org/wiki/File:Surprising_face_of_manga_2022-08-30.png | 2026-11-23 (checked) | CC0 1.0 (checked on the Commons page); uploader-is-author: plausible, not proven | sha1 3bebdda5c58157885bc56a8cd7142c372be88cdd / sha256 f9dc702180a013cba30274059b1819da113c0eb03cbf3f135b804cb5dc68d2ab | accepted by the owner (2026-11-23): not a real person, not a known character; **domain: out** (`gag-chibi`). reviewer: owner | R5 tool-regression fixture and the spike (`tools/fit/`, `docs/adr/0002-spike-*`); committed in `refs/pd/` with its provenance record; not a gate input (domain out); not for hair (no traced curves ship in v1)
+
+An earlier spike reference (Open Clip Art 'Manga Boy') was removed: its Commons description says it depicts a real person. It remains only in the history of PR #8's branch; the PR is squash-merged, so it never enters main.

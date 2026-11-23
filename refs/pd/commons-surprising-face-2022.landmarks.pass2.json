@@ -1,0 +1,13 @@
+{
+  "image": "commons-surprising-face-2022.png", "size": [848, 848], "expression": "surprise",
+  "session": "pass 2: read on 2x zoomed crops of the eyes and the mouth with a 25 px grid, minutes after pass 1 (same marker: not independent, so the spread below is a lower bound of the noise; ADR 0002 R4 asks for a human session a week later)",
+  "definitions": "tools/fit/landmarks.ts",
+  "points": {
+    "chin": [500, 692], "cheekR": [692, 473],
+    "eyeL_outer": [327, 415], "eyeL_inner": [455, 410], "eyeL_top": [385, 374], "eyeL_bottom": [385, 462],
+    "eyeR_inner": [520, 425], "eyeR_outer": [630, 410], "eyeR_top": [570, 377], "eyeR_bottom": [570, 460],
+    "browL": [385, 350], "browR": [593, 335],
+    "mouthL": [303, 605], "mouthR": [627, 605], "mouthC": [465, 605]
+  },
+  "missing": {"cheekL": "hidden by the ear and the hair", "earL": "the ear is a large bump", "earR": "faint", "noseTip": "no nose is drawn"}
+}

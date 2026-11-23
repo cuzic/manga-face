@@ -2,3 +2,10 @@ node_modules/
 dist/
 out/
 .cache/
+__pycache__/
+.venv/
+refs/ai/
+
+.env
+.env.*
+!.env.example

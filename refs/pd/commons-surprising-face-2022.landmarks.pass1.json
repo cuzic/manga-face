@@ -1,0 +1,13 @@
+{
+  "image": "commons-surprising-face-2022.png", "size": [848, 848], "expression": "surprise",
+  "session": "pass 1: read on a 50 px grid overlay of the whole image (2026-11-23)",
+  "definitions": "tools/fit/landmarks.ts (operational definitions; the same on the model side)",
+  "points": {
+    "chin": [500, 692], "cheekR": [692, 473],
+    "eyeL_outer": [327, 420], "eyeL_inner": [457, 410], "eyeL_top": [390, 373], "eyeL_bottom": [390, 462],
+    "eyeR_inner": [520, 425], "eyeR_outer": [632, 415], "eyeR_top": [570, 378], "eyeR_bottom": [575, 460],
+    "browL": [400, 350], "browR": [592, 335],
+    "mouthL": [303, 605], "mouthR": [625, 605], "mouthC": [464, 605]
+  },
+  "missing": {"cheekL": "hidden by the ear and the hair", "earL": "the ear is a large bump, not an ear of the model's kind", "earR": "faint", "noseTip": "no nose is drawn"}
+}
