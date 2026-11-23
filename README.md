@@ -28,8 +28,14 @@ pnpm install
 pnpm typecheck && pnpm lint && pnpm test
 pnpm golden          # compare goldens/*.svg with a rebuild (pnpm golden:write after an intended change of the look)
 pnpm gallery         # out/gallery.svg, out/extras.svg, out/directions.svg
-pnpm measure         # needs playwright-chromium's browser: determinism in Chromium, stage-scale distinguishability, pixel checks
+pnpm measure --check # needs Playwright Chromium. Writes out/measurements.json and fails if a check fails.
+node tools/stage.ts  # out/stage.svg at stage size and 2×
+node tools/blind.ts  # out/blind.html and the scorer’s out/blind-key.json
 ```
+
+`pnpm measure --check` checks stage-scale distinguishability and pixels, top anchors, minimum stroke width, determinism, sampler validity, the comic sample, and compatibility when replacing built-in faces. The pixel grid covers young short hair, mirrored young bob, and mature, each with every named skin and hair colour.
+
+For the stage-size blind review, share `blind.html` with the reviewer. Each card draws an expression independently, so an expression can repeat. Keep the locally generated `blind-key.json` with the scorer and load it after all cards have been answered. CI publishes `blind.html` in `stage-review`.
 
 Work is done by agents from task specs (Issues titled `[codex] …`): see `AGENTS.md`.
 

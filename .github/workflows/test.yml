@@ -51,8 +51,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -76,6 +74,7 @@ jobs:
           PR_BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           baseline=$(mktemp -d)
+          git fetch --depth=1 origin "$PR_BASE"
           git archive "$PR_BASE" src | tar -x -C "$baseline"
           node tools/brow-comparison.ts "$baseline/src/index.ts"
           node tools/png.mjs out/brows-before.svg out/brows-before.png
@@ -86,5 +85,4 @@ jobs:
           path: |
             out/stage.svg
             out/blind.html
-            out/blind-key.json
             out/brows-*.png

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
+import {browSvg} from '../src/brows.ts';
 import {hairParts} from '../src/hair.ts';
-import {CHARACTERS, HAIR, faceFragment, normalize} from '../src/index.ts';
+import {CHARACTERS, HAIR, faceFragment, normalize, prefixIds} from '../src/index.ts';
 
 const ch = (skin: string, hair: string) => ({...CHARACTERS.a, palette: {...CHARACTERS.a.palette, skin, hair}});
 const paths = (svg: string, color: string, width: number) => Array.from(svg.matchAll(
@@ -43,4 +44,27 @@ test('the 8.6-unit paper brow underlay is clipped to the actual union of the hai
 
   assert.ok(!faceFragment(ch('fair', 'blond'), 'neutral').fragment.includes(hair.lockStroke + '</clipPath>'));
   assert.ok(!faceFragment(black, 'surprise', {noFeatureKeyline: true}).fragment.includes(hair.lockStroke + '</clipPath>'));
+});
+
+test('brows reject angles outside the trig table', () => {
+  for (const angle of [-45.1, 45.1, NaN]) {
+    assert.throws(() => browSvg({angle}, 6, 1, 105, 160, 23, 0), RangeError);
+  }
+  for (const angle of [-45, 45]) {
+    assert.doesNotThrow(() => browSvg({angle}, 6, 1, 105, 160, 23, 0));
+  }
+});
+
+test('two faces in one SVG reference only their own clip paths', () => {
+  const faces = [ch('dark', 'black'), CHARACTERS.b].map((character, i) =>
+    prefixIds(faceFragment(character, 'think').fragment, `face-${i}-`));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg">${faces.join('')}</svg>`;
+  const ids = Array.from(svg.matchAll(/<clipPath id="([^"]+)"/g), match => match[1]!);
+  assert.equal(new Set(ids).size, ids.length);
+  faces.forEach((fragment, i) => {
+    const ownIds = new Set(ids.filter(id => id.startsWith(`face-${i}-`)));
+    assert.ok(ownIds.has(`face-${i}-bk`));
+    const refs = Array.from(fragment.matchAll(/clip-path="url\(#([^)]+)\)"/g), match => match[1]);
+    assert.deepEqual(new Set(refs), ownIds);
+  });
 });

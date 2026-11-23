@@ -12,7 +12,7 @@ const baseline: typeof current = await import(pathToFileURL(path.resolve(baselin
 fs.mkdirSync(dir, {recursive: true});
 for (const [name, version] of [['before', baseline], ['after', current]] as const) {
   const cells = ['surprise', 'think'].map((expression, i) => {
-    const face = current.prefixIds(version.faceFragment(version.CHARACTERS.b, expression).fragment, `crop-${i}-`);
+    const face = version.prefixIds(version.faceFragment(version.CHARACTERS.b, expression).fragment, `crop-${i}-`);
     return `<text x="${i * 225 + 110}" y="18" text-anchor="middle">${expression}</text>`
       + `<svg x="${i * 225}" y="26" width="220" height="155" viewBox="65 52 170 120">${face}</svg>`;
   }).join('');

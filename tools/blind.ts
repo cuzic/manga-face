@@ -7,18 +7,16 @@ import type {Character} from '../src/index.ts';
 import {stageCell} from './stage.ts';
 import {OUT, reviewCases} from './stage-cases.ts';
 
-const SEED = 2074;
+const SEED = 2075;
 const PASS_SCORE = 7;
 
 export function blind(rows: readonly {id: string; ch: Character}[]) {
   let state = SEED;
   const targets = rows.map(({id, ch}, row) => {
-    const order = [...ADR0074];
-    for (let i = order.length - 1; i > 0; i--) {
+    const order = ADR0074.map(() => {
       state = (Math.imul(1664525, state) + 1013904223) >>> 0;
-      const j = Math.floor(state / 0x100000000 * (i + 1));
-      [order[i], order[j]] = [order[j]!, order[i]!];
-    }
+      return ADR0074[Math.floor(state / 0x100000000 * ADR0074.length)]!;
+    });
     const cards = order.map((expression, i) => stageCell(ch, expression, `q${row}-${i}`));
     return {id, order, cards};
   });
@@ -38,7 +36,7 @@ export function blind(rows: readonly {id: string; ch: Character}[]) {
   button { padding: .5rem; }
 </style>
 <h1>Stage expression check</h1>
-<p>Use 100% zoom. Choose a name for each face. You can use the same name more than once.</p>
+<p>Use 100% zoom. Choose a name for each face. Some expressions may appear more than once.</p>
 <p id="progress" aria-live="polite"></p>
 <div id="portrait" role="img" aria-label="Face to identify"></div>
 <div id="choices">${ADR0074.map(expression => `<button type="button" value="${expression}">${expression}</button>`).join('')}</div>
@@ -91,7 +89,7 @@ export function blind(rows: readonly {id: string; ch: Character}[]) {
       const list = document.createElement('ul');
       key.targets.forEach(({id, order}, i) => {
         if (typeof id !== 'string' || !Array.isArray(order) || order.length !== names.length
-          || !names.every(name => order.includes(name))) throw new Error();
+          || !order.every(name => names.includes(name))) throw new Error();
         const score = order.filter((name, j) => answers[i][j] === name).length;
         const item = document.createElement('li');
         item.textContent = id + ' — ' + score + '/' + names.length + ' ' + (score >= ${PASS_SCORE} ? 'Pass' : 'Fail');
