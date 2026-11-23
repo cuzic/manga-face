@@ -5,6 +5,7 @@ import {hairParts} from './hair.ts';
 import {HAIR, HEX, IRIS, SKIN, TOP} from './palette.ts';
 import {RANGES, get, normalize} from './params.ts';
 import type {Character, RangeKey} from './params.ts';
+import {DIRECTIONS} from './styles.ts';
 
 export interface Violation {
   group: 'head' | 'eyes' | 'brows' | 'mouth' | 'hair' | 'palette';
@@ -13,16 +14,22 @@ export interface Violation {
   message: string;
 }
 
+const RANGE_EPSILON = 1e-9;
+
 /** Checks the original input ranges and palette, then the normalized geometry (ADR 0001 D2). */
 export function validate(ch: Character, expressions: readonly string[] = ADR0074): Violation[] {
   const out: Violation[] = [];
+  let hasInvalidNumber = false;
   if (!Number.isInteger(ch.hair.strands) || ch.hair.strands < 1) {
     out.push({group: 'hair', code: 'strands', message: 'hair.strands must be an integer >= 1'});
   }
   for (const key of Object.keys(RANGES) as RangeKey[]) {
     const v = get(ch, key), [lo, hi] = RANGES[key];
-    if (!(v >= lo && v <= hi)) {
-      const group = key.split('.')[0] as Violation['group'];
+    const group = key.split('.')[0] as Violation['group'];
+    if (!Number.isFinite(v)) {
+      hasInvalidNumber = true;
+      out.push({group, code: 'range', message: `${key} must be a finite number`});
+    } else if (v < lo - RANGE_EPSILON || v > hi + RANGE_EPSILON) {
       out.push({group, code: 'range', message: `${key}=${v} is outside ${lo}..${hi}`});
     }
   }
@@ -33,7 +40,7 @@ export function validate(ch: Character, expressions: readonly string[] = ADR0074
       out.push({group: 'palette', code: 'palette', message: `palette.${slot}=${JSON.stringify(v)} is neither a known key nor #rrggbb`});
     }
   }
-  if (out.some(violation => violation.group === 'palette')) return out;
+  if (hasInvalidNumber || out.some(violation => violation.group === 'palette')) return out;
   return out.concat(validateRaw(normalize(ch), expressions));
 }
 
@@ -66,11 +73,16 @@ export function validateRaw(ch: Character, expressions: readonly string[] = ADR0
         out.push({group: 'eyes', code: 'eyes-touch', expression, message: `${expression}: the eyes touch at the centre`});
       }
     }
+    let defaultBrows: typeof brows | undefined;
     brows.forEach((brow, i) => {
       // biome-ignore lint/style/noNonNullAssertion: The fragment builds one brow and one eye per side in the same order.
       const eyeTop = eyes[i]!.top + 1;
       if (brow.bottom > eyeTop) {
-        out.push({group: 'brows', code: 'brow-into-eye', expression, message: `${expression}: a brow reaches into its eye (${n(brow.bottom)} > ${n(eyeTop)})`});
+        // Use the same eyes to check whether restoring the default brows clears the overlap.
+        defaultBrows ??= faceFragmentRaw({...ch, brows: DIRECTIONS.young.brows}, expression).features.brows;
+        // biome-ignore lint/style/noNonNullAssertion: The replacement uses the original side order.
+        const group = defaultBrows[i]!.bottom > eyeTop ? 'eyes' : 'brows';
+        out.push({group, code: 'brow-into-eye', expression, message: `${expression}: a brow reaches into its eye (${n(brow.bottom)} > ${n(eyeTop)})`});
       }
       if (brow.top < CY - 100) {
         out.push({group: 'brows', code: 'brow-outside-head', expression, message: `${expression}: a brow leaves the head`});

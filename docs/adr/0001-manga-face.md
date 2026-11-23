@@ -1,8 +1,8 @@
 # ADR 0001: パラメトリックなマンガ風の顔のライブラリ — パーツのスロット、表情のプリセット、`CharacterManifest` の出力
 
-- 状態: 実装中(Q1・Q2 は決定。その他の質問は推奨どおりで進め、ゲートで owner が確認)。U1 から実装してよい。ただし **U3 は、U2 の舞台の大きさのギャラリーを owner が承認してから**。**U7 は svg-diagram の ADR 0080(PR #455)の確定を待つ**
+- 状態: 実装中(Q1・Q2 は決定。その他の質問は推奨どおりで進め、ゲートで owner が確認)。U1 のコアと検査は実装済み。**U3 は、U2 の舞台の大きさのギャラリーを owner が承認してから**。**U7 は svg-diagram の ADR 0080(PR #455)の確定を待つ**
 - 日付: 2026-11-23
-- 出どころ: svg-diagram ADR 0079(PR #454。設計とスパイク。Opus レビュー 3 回で収束: Blocker・Major なし)をこのリポジトリの最初の ADR として移した。`src/face.ts` がそのスパイクの `face.ts`、`tools/` がギャラリーと測定の道具
+- 出どころ: svg-diagram ADR 0079(PR #454。設計とスパイク。Opus レビュー 3 回で収束: Blocker・Major なし)をこのリポジトリの最初の ADR として移した。スパイクの `face.ts` は U1 で `src/` のモジュールに分割した。`tools/` はギャラリーと測定の道具
 - 関連(svg-diagram の側): ADR 0074(`comic()`、`CharacterManifest`、`loadCharacter`、D6 の紙の色)、ADR 0076(D1 マンプ、D4 パレットとキーラインと `recolor`)、ADR 0080(バンドのプラグインの仕組み。PR #455。起草中。ダークモードの規則は改訂中で、色は既定でテーマのトークン、要素ごとに紙の色へ外せる、という方向)、PR #444(Open Peeps など素材の調査)
 - 範囲外: 3/4 や横向きの顔、全身、アニメーション(表情の補間は「将来」に書くだけ)、絵師の素材そのもの、顔を選ぶ画面(Artifact 側)
 - 例のデータはすべてこの ADR のための作り話。ふきだしの文言は中立なもの(「ここが変更点です。」「要確認ですね。」「間に合うかな…」「あとで見ます。」)だけ
@@ -50,7 +50,7 @@ Open Peeps の構造(DiceBear の定義 `open-peeps.json`。PR #444 の `spikes/
 
 | ファイル | 内容 |
 |---|---|
-| `src/face.ts` | パラメータ(範囲と依存する制約つき)→ 検査 → SVG 断片 → `CharacterManifest`。**U1 が分割して固める**。シード付きの乱数。2 つの方向(`DIRECTIONS`)。純粋(数が入り、文字列が出る。`Math.cos` / `sin` / `pow` / `hypot` を使わない) |
+| `src/` | U1 でパラメータ・幾何・検査・SVG 断片・`CharacterManifest`・シード付きの乱数・見た目の方向(`DIRECTIONS`)を別のモジュールに分けた。`face.ts` が再エクスポートし、`index.ts` から公開する。純粋(数が入り、文字列が出る。`Math.cos` / `sin` / `pow` / `hypot` を使わない) |
 | `tools/gallery.ts` | `out/gallery.svg`(表情 8 × 髪 2 × 肌 2。肌は light と brown)、`out/extras.svg`(追加の表情 6) |
 | `tools/directions.ts` | `out/directions.svg` / `directions.png`(見た目の 2 つの方向。**舞台の大きさの行(実寸 → 2 倍)を最初に**、そのあと原寸) |
 | `tools/measure.ts` | 読み込み・大きさ・決定性(Node と Chromium)・アンカー(ラスタ)・見分けやすさ・特徴の線のピクセル検査・キーラインのピクセル検査・コントラスト・最小の線幅・乱数・差し替えの互換・4 コマの `comic()` |
@@ -152,7 +152,7 @@ type Palette = {skin: SkinKey | `#${string}`; hair: HairKey | `#${string}`; top:
 
 これでも残るもの(範囲が両方の下限を満たせない、眉と目の間など)は、`validate` が報告する。
 
-**U1 の検査順(実装済み)**: 範囲・毛束数・パレットは元の入力で検査し、幾何は正規化後に検査する。
+**U1 の検査順(実装済み)**: 数値の型・範囲・毛束数・パレットは元の入力で検査し、幾何は正規化後に検査する。範囲の境界には `1e-9` の浮動小数点の誤差を許す。公開関数 `validateRaw(character, expressions?)` では入力の幾何を直接検査する。
 
 **`validate` は構造化された違反を返す**: `{group: 'head' | 'eyes' | 'brows' | 'mouth' | 'hair' | 'palette', code: string, expression?: string, message: string}[]`。`code` は決まった名前(`range`、`strands`、`palette`、`face-self-intersect`、`head-circle`、`hair-self-intersect`、`eye-outside-face`、`eyes-touch`、`brow-into-eye`、`brow-outside-head`、`mouth-outside-face`、`mouth-reaches-chin`、`mouth-anchor`、`mouth-near-eyes`)で、**修復はメッセージの語句ではなく `group` と `code` で決める**。メッセージは人が読むためのもの。原因が別の群にある違反(眉が目に入るのは `eyes.h` が原因のことがある)は、`group` を原因の側にするか、複数の群を返す(修復が効く側を引き直せる)。
 
@@ -240,7 +240,8 @@ type Palette = {skin: SkinKey | `#${string}`; hair: HairKey | `#${string}`; top:
 
 ```ts
 faceManifest(character: MangaCharacter, opts?: {expressions?: readonly ComicExpression[]; expressionMap?: Partial<Record<ComicExpression, string>>}): CharacterManifest
-validate(character: MangaCharacter): string[]                 // D2 の不変条件の違反(空なら有効)
+validate(character: MangaCharacter): Violation[]               // D2 の不変条件の違反(空なら有効)
+validateRaw(character: MangaCharacter, expressions?: readonly string[]): Violation[] // 入力の幾何だけ
 randomCharacter(seed: string | number, constraints?: Constraints): MangaCharacter
 type Constraints = {template?: 'short' | 'bob'; skin?: readonly SkinKey[]; hair?: readonly HairKey[]; ahoge?: boolean; style?: 'young' | 'mature'}
 presets: Record<string, Preset>
@@ -250,7 +251,9 @@ presets: Record<string, Preset>
 - **乱数の人物**(`randomCharacter`): `xmur3` のハッシュと `mulberry32`(外部に依存しない小さな実装)。**項目ごとに別の流れ**(`xmur3(世代 : シード : 項目名)`)を使い、テンプレートや項目を足しても、ほかの項目の値が変わらない。
   - **作りで有効にする**: 値は範囲の中の、**依存する制約(D2)も満たす範囲**から選ぶ(`normalize` が適用する)。目標は**最初の抽選の有効率 99% 以上**(スパイク: 1000 / 1000)。
   - **落ちたら、落ちた群だけ直す**: `validate` が返す**構造化された違反 `{group, code}`**(下の D2。メッセージの語句では判定しない)の群(目、眉、口、頭、髪)だけを、`項目#k` の別の流れで引き直す(k = 1〜4)。それでも落ちる群は、若い方向の既定値に置き換える。**そのあとにもう一度 `validate` し、まだ落ちるなら内部エラーを投げる**(無効な人物を黙って返すことが起きない。常に有効な人物を返すか、バグとして落ちるか)。**ほかの群は、引いた値を保つ。ただし、頭を直すと `normalize` が依存する制約(D2)を当て直すので、`eyes.gap` / `eyes.w` / `mouth.y` / `mouth.w` は丸め直されうる**。全部を引き直さない。
+  - `brow-into-eye` は若い方向の既定の眉でも重なる場合に `eyes`、既定の眉で解消する場合に `brows` とし、眉だけの修復で解消できるかで引き直す群を決める。
   - **世代番号 `GENERATOR`(いま 2)は、範囲・依存する制約・乱数の作り・`validate`・プリセットのどれかを変えたら上げる**。**シードが安定なのは同じ世代の中だけ**。固定のシードの組(0〜2 など)のスナップショットを、テストに置く(世代を上げ忘れると、スナップショットが落ちる)。
+  - PR #9 の U1 レビュー対応ではシードの出力を維持し、タスク仕様どおり世代 2 を使う。
   - 制約(`Constraints`)で髪のテンプレート、肌・髪の候補、あほ毛の有無、方向を絞れる。
 - **鏡像(`mirror`)**: 正面の顔は左右対称なので、**鏡像が意味を持つのは、左右非対称の部品(分け目、あほ毛の房、片方だけの要素)か、3/4 の顔が入ってから**。いまは `parting` と視線の符号を反転するのと変わらない。ライブラリには `mirror` を残すが、**v1 の約束には入れない**(口のアンカーは正面では `x = cx` で、アンカーの反転の試験は空になる)。`cast` は 1 つの素材に対応するので、向きを**コマごとに**変えるには別の `cast` id(同じ人物の `mirror` 版)が要る。**向きは `stage.at` に合わせて `comic()` が決めるのが筋**(`facing` の項目。3/4 の顔と一緒に決める)。
 - **アンカー(パラメータから計算する)**:
