@@ -5,3 +5,7 @@ out/
 __pycache__/
 .venv/
 refs/ai/
+
+.env
+.env.*
+!.env.example
