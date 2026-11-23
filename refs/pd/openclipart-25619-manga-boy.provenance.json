@@ -1,0 +1,14 @@
+{
+  "file": "openclipart-25619-manga-boy.png",
+  "sha1": "b42491da86de0d21289ed6e37c828b87d373bce0",
+  "title": "Manga Boy (a front-facing manga-style face, colour illustration, 720x800)",
+  "author": "Astrid Graeber",
+  "source": "Wikimedia Commons, File:Manga Boy.png (uploaded by Hyju, 2010-10-26), originally Open Clip Art Library item 25619",
+  "source_url": "https://commons.wikimedia.org/wiki/File:Manga_Boy.png",
+  "licence": "CC0 1.0 (Commons template PD-OpenClipart / CC-Zero; the Commons page states 'Creative Commons Zero, Public Domain Dedication', attribution not required)",
+  "licence_checked": "2026-11-23, by reading the Commons page's metadata (LicenseShortName CC0, UsageTerms) and the wikitext ({{PD-OpenClipart}})",
+  "kind": "reference-pd-cc0",
+  "use": "spike of docs/adr/0002: vectorization (potrace) and a landmark fit of the parametric model. Tracing and committing are allowed for PD/CC0 sources with this record.",
+  "ai_generated": false,
+  "review": "a person looked at it: a generic front-facing manga boy; not a known character"
+}

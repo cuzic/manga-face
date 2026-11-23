@@ -4,7 +4,9 @@ import path from 'node:path';
 import {test} from 'node:test';
 import {PRESETS} from '../src/index.ts';
 
-const text = fs.readFileSync(path.join(import.meta.dirname, '../PROVENANCE.md'), 'utf8');
+const full = fs.readFileSync(path.join(import.meta.dirname, '../PROVENANCE.md'), 'utf8');
+// the first table lists the parts of the shipped art; the references (ADR 0002) have their own table after "## References"
+const text = full.split('## References')[0] ?? full;
 
 test('every part named in the source has a row in PROVENANCE.md (a PR that adds a part adds its row)', () => {
   for (const part of ['face outline', 'eyes', 'brows', 'mouths', 'nose', 'hair templates', 'presets', 'body, neck, ears']) {

@@ -1,0 +1,136 @@
+{
+  "reference": "openclipart-25619-manga-boy.png",
+  "unit": "model units (the head circle has r = 100)",
+  "nfev": 63,
+  "cost": 216.40393917059623,
+  "baseline_young_default": {
+    "rms": 11.031491258404184,
+    "max": 16.30447916856704,
+    "argmax": "mouthL"
+  },
+  "fitted": {
+    "rms": 5.340694827446281,
+    "max": 11.469869956586315,
+    "argmax": "earL"
+  },
+  "map": {
+    "s": 0.31310864269966654,
+    "tx": 28.485543026409644,
+    "ty": 3.6127987474969245
+  },
+  "params": {
+    "head.cheek": 74.0,
+    "head.chin": 98.0,
+    "eyes.w": 25.0,
+    "eyes.h": 13.0,
+    "eyes.y": 14.0,
+    "eyes.gap": 42.0,
+    "brows.dy": 5.0,
+    "mouth.w": 47.0,
+    "mouth.y": 66.0
+  },
+  "at_bound": [
+    "head.cheek",
+    "head.chin",
+    "eyes.h",
+    "eyes.y"
+  ],
+  "residual_by_landmark": {
+    "chin": 5.5,
+    "cheekL": 8.6,
+    "cheekR": 10.0,
+    "earL": 11.5,
+    "earR": 6.2,
+    "eyeL_outer": 2.7,
+    "eyeL_inner": 6.6,
+    "eyeL_top": 3.6,
+    "eyeL_bottom": 3.2,
+    "eyeR_inner": 4.3,
+    "eyeR_outer": 3.4,
+    "eyeR_top": 2.0,
+    "eyeR_bottom": 0.8,
+    "browL": 2.7,
+    "browR": 4.6,
+    "noseTip": 5.9,
+    "mouthL": 4.4,
+    "mouthR": 1.0,
+    "mouthC": 2.0,
+    "crown": 0.8
+  },
+  "baseline_residual_by_landmark": {
+    "chin": 14.2,
+    "cheekL": 11.8,
+    "cheekR": 14.6,
+    "earL": 12.1,
+    "earR": 10.0,
+    "eyeL_outer": 11.4,
+    "eyeL_inner": 9.8,
+    "eyeL_top": 6.4,
+    "eyeL_bottom": 12.9,
+    "eyeR_inner": 9.8,
+    "eyeR_outer": 11.0,
+    "eyeR_top": 4.8,
+    "eyeR_bottom": 12.2,
+    "browL": 9.1,
+    "browR": 8.9,
+    "noseTip": 8.4,
+    "mouthL": 16.3,
+    "mouthR": 13.0,
+    "mouthC": 7.0,
+    "crown": 9.8
+  },
+  "character": {
+    "id": "fit",
+    "name": "fit",
+    "head": {
+      "cheek": 74.0,
+      "chin": 98.0,
+      "jaw": 0.65,
+      "chinW": 4
+    },
+    "eyes": {
+      "w": 25.0,
+      "h": 13.0,
+      "tilt": 0,
+      "iris": 1,
+      "y": 14.0,
+      "gap": 42.0,
+      "lashes": true,
+      "lidW": 7
+    },
+    "brows": {
+      "thick": 6,
+      "dy": 5.0
+    },
+    "mouth": {
+      "w": 47.0,
+      "y": 66.0
+    },
+    "nose": "dot",
+    "hair": {
+      "template": "short",
+      "strands": 4,
+      "parting": 0.5,
+      "ahoge": "none",
+      "highlight": true,
+      "sideLen": 36
+    },
+    "palette": {
+      "skin": "fair",
+      "hair": "black",
+      "top": "blue",
+      "iris": "blue"
+    }
+  },
+  "appearance_chamfer": {
+    "box": [
+      200,
+      400,
+      580,
+      790
+    ],
+    "unit": "px of the 720x800 reference; the head is about 440 px wide",
+    "chamfer_baseline": 19.926901205437225,
+    "chamfer_fit": 9.720800585507861
+  }
+}

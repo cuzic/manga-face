@@ -18,3 +18,11 @@ A part is a face outline, an eye kind, a brow, a mouth kind, a nose, a hair temp
 | body, neck, ears (`faceFragment`) | coding assistant (Claude) for the owner | 2026-11-22 | geometry written as code | none | owner checkpoint (U2) |
 
 "Method" is one of: *by a person as code*, *by a coding assistant as code*. Anything else (a generative model's drawing, a trace, a reference-matched adjustment) is not allowed in v1.
+
+## References (ADR 0002; not shipped as art)
+
+References are used for fitting and evaluation only. The shipped art is always our code redrawing from parameters. **Generative-model images are not kept in this repository** (a private store; see ADR 0002 D6/D9); only a row per image (hash, result) will be listed here once the ADR is accepted and generation has started. No generated image exists yet.
+
+| Id | Kind | Source / model | Date | Licence | Hash (sha1 / sha256) | Review | Used for |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| openclipart-25619-manga-boy | pd-cc0 | Wikimedia Commons `File:Manga Boy.png` by Astrid Graeber (Open Clip Art Library 25619), https://commons.wikimedia.org/wiki/File:Manga_Boy.png | 2026-11-23 (checked) | CC0 1.0 / PD-OpenClipart (checked on the Commons page) | sha1 b42491da86de0d21289ed6e37c828b87d373bce0 | a person looked at it: a generic front-facing manga boy | spike: potrace + landmark fit (`tools/fit/`, `docs/adr/0002-spike-*`); committed in `refs/pd/` with its provenance record |
