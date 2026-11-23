@@ -1,0 +1,480 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reviewed manga-face reference",
+  "type": "object",
+  "required": [
+    "kind",
+    "sha256",
+    "review",
+    "reviewer",
+    "used_for"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reviewer": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "date": {
+      "type": "string",
+      "minLength": 1
+    },
+    "author": {
+      "type": "string",
+      "minLength": 1
+    },
+    "licence": {
+      "type": "string",
+      "minLength": 1
+    },
+    "licence_checked": {
+      "type": "string",
+      "minLength": 1
+    },
+    "uploader_is_author_check": {
+      "type": "string",
+      "minLength": 1
+    },
+    "out_reason_detail": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "enum": [
+        "ai-generated",
+        "pd-cc0"
+      ]
+    },
+    "sha256": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "review": {
+      "enum": [
+        "accepted",
+        "discarded"
+      ]
+    },
+    "reason": {
+      "enum": [
+        "resembles",
+        "depicts-real-person",
+        "quality",
+        "out-of-scope"
+      ]
+    },
+    "domain": {
+      "enum": [
+        "young",
+        "mature",
+        "out"
+      ]
+    },
+    "out_reason": {
+      "enum": [
+        "gag-chibi",
+        "realistic",
+        "non-manga",
+        "other-direction",
+        "other"
+      ]
+    },
+    "source_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "tier": {
+      "enum": [
+        "A",
+        "B"
+      ]
+    },
+    "depicts_real_person": {
+      "type": "boolean"
+    },
+    "resembles_known_character": {
+      "type": "boolean"
+    },
+    "used_for": {
+      "enum": [
+        "fit",
+        "eval",
+        "none"
+      ]
+    },
+    "request": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "provenance_metadata": {
+      "anyOf": [
+        {
+          "const": "none"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    },
+    "cells": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "$ref": "#/$defs/cell"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "position": {
+                "const": 0
+              },
+              "expression": {
+                "const": "neutral"
+              }
+            }
+          },
+          "minContains": 0,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "position": {
+                "const": 1
+              },
+              "expression": {
+                "const": "smile"
+              }
+            }
+          },
+          "minContains": 0,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "position": {
+                "const": 2
+              },
+              "expression": {
+                "const": "surprise"
+              }
+            }
+          },
+          "minContains": 0,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "position": {
+                "const": 3
+              },
+              "expression": {
+                "const": "angry"
+              }
+            }
+          },
+          "minContains": 0,
+          "maxContains": 1
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "cell": {
+      "type": "object",
+      "required": [
+        "position",
+        "expression",
+        "review"
+      ],
+      "properties": {
+        "position": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "expression": {
+          "enum": [
+            "neutral",
+            "smile",
+            "surprise",
+            "angry"
+          ]
+        },
+        "review": {
+          "enum": [
+            "accepted",
+            "discarded"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "resembles",
+            "depicts-real-person",
+            "quality",
+            "out-of-scope"
+          ]
+        },
+        "ink_threshold": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "review": {
+                "const": "discarded"
+              }
+            },
+            "required": [
+              "review"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "position": {
+                "const": 0
+              }
+            },
+            "required": [
+              "position"
+            ]
+          },
+          "then": {
+            "properties": {
+              "expression": {
+                "const": "neutral"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "position": {
+                "const": 1
+              }
+            },
+            "required": [
+              "position"
+            ]
+          },
+          "then": {
+            "properties": {
+              "expression": {
+                "const": "smile"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "position": {
+                "const": 2
+              }
+            },
+            "required": [
+              "position"
+            ]
+          },
+          "then": {
+            "properties": {
+              "expression": {
+                "const": "surprise"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "position": {
+                "const": 3
+              }
+            },
+            "required": [
+              "position"
+            ]
+          },
+          "then": {
+            "properties": {
+              "expression": {
+                "const": "angry"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "review": {
+            "const": "accepted"
+          }
+        },
+        "required": [
+          "review"
+        ]
+      },
+      "then": {
+        "required": [
+          "domain"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "review": {
+            "const": "discarded"
+          }
+        },
+        "required": [
+          "review"
+        ]
+      },
+      "then": {
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "used_for": {
+            "const": "none"
+          }
+        },
+        "not": {
+          "required": [
+            "domain"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "domain": {
+            "const": "out"
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      },
+      "then": {
+        "required": [
+          "out_reason"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "out_reason": {
+            "const": "other"
+          }
+        },
+        "required": [
+          "out_reason"
+        ]
+      },
+      "then": {
+        "required": [
+          "out_reason_detail"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "ai-generated"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "id",
+          "model",
+          "date",
+          "request",
+          "provenance_metadata",
+          "cells"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "pd-cc0"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "tier",
+          "source_url",
+          "author",
+          "licence",
+          "licence_checked",
+          "depicts_real_person",
+          "resembles_known_character"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tier": {
+            "const": "B"
+          }
+        },
+        "required": [
+          "tier"
+        ]
+      },
+      "then": {
+        "required": [
+          "uploader_is_author_check"
+        ]
+      }
+    }
+  ]
+}
