@@ -215,12 +215,12 @@ class CheckpointAndPolicyTest(unittest.TestCase):
         points = {"chin": [100, 200], "noseTip": [100, 150], "browL": [80, 110]}
         a = {**fields, "pass": 1, "inference_id": "a", "points": points}
         b = {**fields, "pass": 2, "inference_id": "b", "points": points}
-        zoom = {**fields, "pass": "zoom", "inference_id": "c", "points": {**points, "noseTip": [110, 150]}}
+        zoom = {**fields, "pass": "zoom", "inference_id": "c", "source_size": [816, 816], "points": {**points, "noseTip": [110, 150]}}
         metrics = {"error_px": {"chin": 1, "noseTip": 1, "browL": 1}, "missed_visible": [],
                    "false_positive_on_occluded": ["browL"]}
         report = {"model_version": "model", "invalid_responses": 0, "readings": [
-            {"sent_configuration_sha256": "a" * 64, "metrics": metrics},
-            {"sent_configuration_sha256": "a" * 64, "metrics": metrics},
+            {"sent_configuration_sha256": "a" * 64, "size": [408, 408], "metrics": metrics},
+            {"sent_configuration_sha256": "a" * 64, "size": [408, 408], "metrics": metrics},
         ]}
         self.assertEqual(qualified_points(a, b, zoom, report), {"chin"})
 
@@ -234,3 +234,33 @@ class CheckpointAndPolicyTest(unittest.TestCase):
                 self.assertEqual(set(neutral["missing"]), {f"cheek{suffix}", f"ear{suffix}", f"eye{suffix}_outer", f"brow{suffix}"})
                 self.assertEqual(set(expression["missing"]), {f"eye{suffix}_outer", f"brow{suffix}"})
                 self.assertEqual(len(expression["points"]) + len(expression["missing"]), 13)
+
+    def test_resuming_invalid_report_only_retries_the_archived_attempt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "report.json"
+            names = landmark_inference.DEFINITIONS
+            truth = {"size": [16, 16], "image_sha256": "test", "points": dict.fromkeys(names, [1, 1]), "missing": []}
+            request = {"size": [16, 16], "prompt": "test"}
+            fixture = ("neutral", truth, {"png_sha256": "test"}, request, names)
+            calls = []
+
+            def reply(command, **kwargs):
+                calls.append(command)
+                response = {"model_version": "model", "inference_id": f"test-{len(calls)}",
+                            "points": dict.fromkeys(names, [1, 1]), "missing": {}}
+                if len(calls) == 2:
+                    response["error"] = "bad reply"
+                return subprocess.CompletedProcess(command, 0, json.dumps(response), "")
+
+            run = run_landmark_calibration.run_report
+            with patch.object(run_landmark_calibration, "checked_fixtures", return_value=[fixture]):
+                with patch("vision_checkpoint.subprocess.run", side_effect=reply):
+                    first = run(root, "model", ["mock"], output, ["neutral"])
+                    self.assertEqual(first["invalid_responses"], 1)
+                    failed = output.with_suffix(".checkpoint") / "neutral-2.json"
+                    failed.rename(root / "archived-failed.json")
+                    result = run(root, "model", ["mock"], output, ["neutral"], resume_invalid=True)
+            self.assertEqual(len(calls), 3)
+            self.assertEqual(result["invalid_responses"], 0)
+            self.assertEqual(len(list(root.glob("report.superseded-*.json"))), 1)

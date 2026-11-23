@@ -12,7 +12,7 @@ from PIL import Image
 
 import landmark_calibration as calibration
 import landmark_inference as runner
-from vision_checkpoint import decode, read_or_attempt
+from vision_checkpoint import decode, read_or_attempt, write_record
 
 @contextmanager
 def calibration_lock(output):
@@ -67,7 +67,7 @@ def evaluate(fixtures, model, adapter, checkpoint, cases=calibration.BASE_CASES)
     for name, truth, raster, request, definitions in inputs:
         for repeat in (1, 2):
             identity = {
-                "fixture": name, "pass": repeat, "model_version": model,
+                "fixture": name, "pass": repeat, "model_version": model, "size": request["size"],
                 **raster,
                 "prompt_sha256": hashlib.sha256(request["prompt"].encode()).hexdigest(),
             }
@@ -102,27 +102,39 @@ def evaluate(fixtures, model, adapter, checkpoint, cases=calibration.BASE_CASES)
     }
 
 
+def run_report(fixtures, model, adapter, output, cases, resume_invalid=False):
+    with calibration_lock(output):
+        if output.exists():
+            old = output.read_bytes()
+            prior = json.loads(old)
+            if not resume_invalid or not prior.get("invalid_responses"):
+                raise ValueError("provide a new output path or explicitly resume an invalid report")
+            if prior["model_version"] != model:
+                raise ValueError("resumed report uses a different model")
+            archive = output.with_name(f"{output.stem}.superseded-{hashlib.sha256(old).hexdigest()}.json")
+            if not archive.exists():
+                archive.hardlink_to(output)
+        result = evaluate(fixtures, model, adapter, output.with_suffix(".checkpoint"), cases)
+        write_record(output, result)
+        return result
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fixtures", required=True, type=Path)
     parser.add_argument("--model", required=True)
     parser.add_argument("--expanded", action="store_true", help="also read expression and side-occlusion fixtures (twelve extra calls)")
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--resume-invalid", action="store_true")
     parser.add_argument("--adapter", required=True, nargs=argparse.REMAINDER)
     args = parser.parse_args()
     try:
         if not args.adapter:
             raise ValueError("provide an adapter command")
-        with calibration_lock(args.output):
-            if args.output.exists():
-                raise ValueError("provide a new output path")
-            cases = calibration.BASE_CASES
-            if args.expanded:
-                sides = tuple(calibration.HAIR_CASES)
-                cases += tuple(calibration.EXPRESSION_CASES) + sides + tuple("expression-" + side for side in sides)
-            result = evaluate(args.fixtures, args.model, args.adapter, args.output.with_suffix(".checkpoint"), cases)
-            with args.output.open("x") as destination:
-                json.dump(result, destination, indent=2, allow_nan=False)
-                destination.write("\n")
+        cases = calibration.BASE_CASES
+        if args.expanded:
+            sides = tuple(calibration.HAIR_CASES)
+            cases += tuple(calibration.EXPRESSION_CASES) + sides + tuple("expression-" + side for side in sides)
+        run_report(args.fixtures, args.model, args.adapter, args.output, cases, args.resume_invalid)
     except (OSError, KeyError, TypeError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(2, f"{error}\n")

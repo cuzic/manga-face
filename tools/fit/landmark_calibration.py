@@ -71,7 +71,8 @@ def generate(output):
         ('expression-right-side-hidden', 1, 20, 18, False),
     ):
         cover, hidden_names = HAIR_CASES.get(name.removeprefix("expression-"), (OCCLUSION, {'browL'}) if hidden else ('', set()))
-        face, changes = EXPRESSION_CASES.get(name, (FACE, {}))
+        expression = {"expression-left-side-hidden": "angry", "expression-right-side-hidden": "smile"}.get(name, name)
+        face, changes = EXPRESSION_CASES.get(expression, (FACE, {}))
         svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="408" height="408" viewBox="0 0 408 408"><rect width="408" height="408" fill="white"/><g transform="translate({dx} {dy}) scale({scale})" fill="none" stroke="#151515" stroke-width="1">{face}{cover}</g></svg>\n'
         image = output / f'{name}.svg'
         image.write_text(svg)

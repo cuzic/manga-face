@@ -153,7 +153,7 @@ def run(image_path, manifest_path, destination, model, adapter):
                 output.update(image=image_path.name, model_version=model, inference_id=inference_id,
                               prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
                               size=[width, height], expression=expression, position=position,
-                              origin=[x, y], points=points, missing=missing)
+                              origin=[x, y], source_size=current_request["size"], points=points, missing=missing)
                 for field in ("sent_request_sha256", "sent_configuration_sha256"):
                     if field in response:
                         output[field] = response[field]

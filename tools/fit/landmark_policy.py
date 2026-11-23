@@ -2,9 +2,11 @@
 import math
 
 from landmark_calibration import summarize
+from vision_checkpoint import digest
 
-POLICY_VERSION = "r4-calibration-v2"
 OCCLUSION_REQUIRED = {"cheekL", "cheekR", "earL", "earR", "eyeL_outer", "eyeR_outer", "browL", "browR"}
+LIMITS = {"min_visible": 2, "min_detection": 0.9, "max_rms_px": 2, "max_zoom_px": 3, "min_occluded": 2}
+POLICY_VERSION = digest({"limits": LIMITS, "occlusion_required": sorted(OCCLUSION_REQUIRED)})
 
 
 def qualified_points(first, second, zoom, report):
@@ -18,22 +20,23 @@ def qualified_points(first, second, zoom, report):
     bound_fields = ("reference_id", "image_sha256", "record_sha256", "image", "size", "position", "origin", "expression")
     if (zoom.get("pass") != "zoom" or zoom.get("model_version") != model
             or zoom.get("sent_configuration_sha256") != configuration
+            or zoom.get("source_size") != [dimension * 2 for dimension in first["size"]]
             or any(zoom.get(field) != first[field] for field in bound_fields)
             or not zoom.get("inference_id") or zoom["inference_id"] in {first["inference_id"], second["inference_id"]}):
         raise ValueError("zoom reading does not match the fitted reference")
     metrics = [reading["metrics"] for reading in report["readings"]
-               if reading.get("sent_configuration_sha256") == configuration]
+               if reading.get("sent_configuration_sha256") == configuration and reading.get("size") == first["size"]]
     if len(metrics) < 2:
         raise ValueError("fit needs repeated calibration of the configuration used for this expression")
     stats = summarize(metrics)
     allowed = set()
     for name in first["points"].keys() & second["points"].keys() & zoom["points"].keys():
         item = stats[name]
-        if (item["visible_readings"] >= 2 and item["detection_rate"] >= 0.9
-                and item["rms_px"] is not None and item["rms_px"] <= 2
+        if (item["visible_readings"] >= LIMITS["min_visible"] and item["detection_rate"] >= LIMITS["min_detection"]
+                and item["rms_px"] is not None and item["rms_px"] <= LIMITS["max_rms_px"]
                 and item["false_positive_on_occluded"] == 0
-                and (name not in OCCLUSION_REQUIRED or item["occluded_readings"] >= 2)
-                and all(math.dist(reading["points"][name], zoom["points"][name]) <= 3
+                and (name not in OCCLUSION_REQUIRED or item["occluded_readings"] >= LIMITS["min_occluded"])
+                and all(math.dist(reading["points"][name], zoom["points"][name]) <= LIMITS["max_zoom_px"]
                         for reading in (first, second))):
             allowed.add(name)
     return allowed
