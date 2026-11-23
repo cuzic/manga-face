@@ -11,11 +11,9 @@ import type {ComicWorksheet} from 'svg-diagram';
 import {assertLoads} from './conformance.ts';
 import {ADR0074, BOX, CHARACTERS, CX, CY, HAIR, HEAD_R, INK, KEY_BELOW, SCALE, SKIN, GENERATOR, contrast, faceFragment, needsKeyline, normalize, randomCharacter, randomCharacterDetailed, toManifest, validate, RANGES, type Character} from '../src/index.ts';
 import {sheet} from './gallery.ts';
-import {judge, lowest, median} from './measure-check.ts';
+import {FEATURE_MIN_FRACTION, KEYLINE_MIN_PIXELS, judge, judgePixels, lowest, median} from './measure-check.ts';
 import type {Distribution, Person} from './measure-check.ts';
 import {OUT, STAGE_HEIGHT, STAGE_WIDTH, extremes, randomCases, showcase} from './stage-cases.ts';
-
-export {judge} from './measure-check.ts';
 
 interface Raster {w: number; h: number; d: Uint8ClampedArray}
 type RasterWindow = Window & {__ras: (box: readonly number[], frag: string, scale: number, background: boolean) => Promise<Raster>};
@@ -94,9 +92,11 @@ async function measure(dir: string, check: boolean) {
   stat['pathCount'] = (a.expressions.neutral!.match(/<path/g) ?? []).length;
 
   // 2. determinism: twice, from a deep copy, and in Chromium (the generator bundled with esbuild and run in the page)
-  stat['deterministic'] = JSON.stringify(a) === JSON.stringify(toManifest(structuredClone(CHARACTERS.a)));
+  const deterministic = JSON.stringify(a) === JSON.stringify(toManifest(structuredClone(CHARACTERS.a)));
+  stat['deterministic'] = deterministic;
   const g1 = sheet(ADR0074);
-  stat['galleryDeterministic'] = g1 === sheet(ADR0074);
+  const galleryDeterministic = g1 === sheet(ADR0074);
+  stat['galleryDeterministic'] = galleryDeterministic;
   stat['galleryBytes'] = bytes(g1);
   const bundle = execFileSync(path.join(import.meta.dirname, '../node_modules/.bin/esbuild'), [path.join(import.meta.dirname, '../src/index.ts'), '--bundle', '--format=iife', '--global-name=MF', '--platform=browser', '--log-level=error'], {encoding: 'utf8'});
   const {chromium} = await import('playwright-chromium');
@@ -108,23 +108,32 @@ async function measure(dir: string, check: boolean) {
     const rnd = Array.from({length: 40}, (_, i) => randomCharacter(i));
     const inNode = JSON.stringify([a, b, m, ...rnd.map(c => toManifest(c))]);
     const inChromium = await page.evaluate(({cs, seeds}) => JSON.stringify([...cs.map((c: any) => (window as any).MF.toManifest(c)), ...seeds.map((s: number) => (window as any).MF.toManifest((window as any).MF.randomCharacter(s)))]), {cs: [CHARACTERS.a, CHARACTERS.b, CHARACTERS.m], seeds: rnd.map((_, i) => i)});
-    stat['chromiumIdentical'] = {characters: 3 + rnd.length, identical: inNode === inChromium};
+    const chromiumIdentical = inNode === inChromium;
+    stat['chromiumIdentical'] = {characters: 3 + rnd.length, identical: chromiumIdentical};
+    checks.push({criterion: 'Manifest and gallery determinism', pass: deterministic && galleryDeterministic && chromiumIdentical,
+      value: `Node manifest: ${deterministic}, Node gallery: ${galleryDeterministic}, Node/Chromium manifests: ${chromiumIdentical} (${3 + rnd.length} characters)`});
 
     await page.addScriptTag({content: rasterJs});
 
     // 3. anchors by raster: the first non-transparent row of every expression, against the declared `top` (no tolerance)
     const SC = 4;
-    const anchors: Record<string, unknown> = {};
+    const anchors: Record<string, {declaredTop: number | null; rasterTop: number | null; ok: boolean; atLeast23: boolean}> = {};
     for (const [k, x] of [['a', a], ['b', b], ['mature', m]] as const) {
-      const tops: number[] = [];
+      const tops: (number | null)[] = [];
       for (const e of ADR0074) {
         const r = await page.evaluate(async ({box, frag, sc}) => { const q = await (window as unknown as RasterWindow).__ras(box, frag, sc, false); for (let y = 0; y < q.h; y++) for (let x2 = 0; x2 < q.w; x2++) if (q.d[(y * q.w + x2) * 4 + 3]! > 8) return box[1]! + y / sc; return null; }, {box: [...x.box], frag: x.expressions[e]!, sc: SC});
-        tops.push(r as number);
+        tops.push(r);
       }
-      const minTop = Math.min(...tops);
-      anchors[k] = {declaredTop: x.anchors.top, rasterTop: minTop, ok: x.anchors.top! <= minTop, atLeast23: x.anchors.top! >= 23};
+      const minTop = tops.every(top => top !== null) ? Math.min(...tops) : null;
+      const declaredTop = x.anchors.top ?? null;
+      anchors[k] = {declaredTop, rasterTop: minTop, ok: declaredTop !== null && minTop !== null && declaredTop <= minTop,
+        atLeast23: declaredTop !== null && declaredTop >= 23};
     }
     stat['anchors'] = anchors;
+    checks.push({criterion: 'Top anchors ≥ 23 and at or above the raster',
+      pass: Object.values(anchors).every(anchor => anchor.ok && anchor.atLeast23),
+      value: Object.entries(anchors).map(([id, {declaredTop, rasterTop}]) =>
+        `${id}: ${declaredTop ?? 'missing top'} / ${rasterTop ?? 'empty raster'}`).join(', ')});
 
     // 4. The 28 expression pairs at stage scale (DPR 1), over the head circle’s bounding square.
     const collect = (rows: readonly {id: string; ch: Character}[]) => Promise.all(rows.map(({id, ch}) => distinct(page, ch, id)));
@@ -147,7 +156,7 @@ async function measure(dir: string, check: boolean) {
     //    (b) each boundary keyline changes the picture (>= 100 px); with a negative control (feature keylines off)
     const lineCheck = async (chs: Character[], exprs: string[], noKey: boolean) => {
       const pairs = chs.flatMap(c => exprs.map(e => ({full: faceFragment(c, e, {features: 'lines', noFeatureKeyline: noKey}).fragment, bare: faceFragment(c, e, {features: false}).fragment, c: c.id, e})));
-      return page.evaluate(async ({box, pairs, ink}) => {
+      return page.evaluate(async ({box, pairs, ink, minFraction}) => {
         const lumv = (r: number, g: number, b: number) => { const f = (v: number) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
         const li = lumv(ink[0]!, ink[1]!, ink[2]!); const cr = (r: number, g: number, b: number) => { const l = lumv(r, g, b); return (Math.max(l, li) + 0.05) / (Math.min(l, li) + 0.05); };
         let worst = {id: '', fraction: Infinity}, edgeTotal = 0, passTotal = 0;
@@ -175,35 +184,27 @@ async function measure(dir: string, check: boolean) {
           const frac = edge ? pass / edge : 0;
           const id = `${p.c}/${p.e}`;
           if (frac < worst.fraction) worst = {id, fraction: frac};
-          if (frac < 0.85) failing.push(`${id}=${(frac * 100).toFixed(2)}%`);
+          if (frac < minFraction) failing.push(`${id}=${(frac * 100).toFixed(2)}%`);
         }
         return {worst, failing, edgePixels: edgeTotal, passingPixels: passTotal, totalFraction: edgeTotal ? passTotal / edgeTotal : 0, cases: pairs.length};
-      }, {box: [...BOX], pairs, ink: [0x22, 0x20, 0x1b]});
+      }, {box: [...BOX], pairs, ink: [0x22, 0x20, 0x1b], minFraction: FEATURE_MIN_FRACTION});
     };
-    const skins = Object.keys(SKIN), hairs = ['black', 'blond', 'navy'];
-    const grid: Character[] = skins.flatMap(s => hairs.map(h => ({...structuredClone(CHARACTERS.a), id: `${s}-${h}`, mirror: false, palette: {...CHARACTERS.a.palette, skin: s, hair: h}} as Character)));
+    const characters = Object.values(CHARACTERS), skins = Object.keys(SKIN), hairs = Object.keys(HAIR);
+    const grid: Character[] = characters.flatMap(character => skins.flatMap(skin => hairs.map(hair => ({
+      ...character, id: `${character.id}/${skin}/${hair}`, palette: {...character.palette, skin, hair},
+    }))));
     const exprs = [...ADR0074, ...EXTRA];
     const features = await lineCheck(grid, exprs, false);
     const control = await lineCheck(grid, exprs, true);
-    stat['featurePixels'] = {...features, grid: `${skins.length} skins x ${hairs.length} hairs x ${exprs.length} expressions`};
+    stat['featurePixels'] = {...features, grid: `${characters.length} characters x ${skins.length} skins x ${hairs.length} hairs x ${exprs.length} expressions`};
     stat['featurePixelsControlNoKeyline'] = control;
     const keyChanges = async (kind: 'hairFace' | 'faceNeck') => page.evaluate(async ({box, pairs}) => { const out: number[] = []; for (const p of pairs) { const A = await (window as unknown as RasterWindow).__ras(box, p.on, 1.08, true), B = await (window as unknown as RasterWindow).__ras(box, p.off, 1.08, true); let n = 0; for (let i = 0; i < A.d.length; i += 4) if (Math.abs(A.d[i]! - B.d[i]!) + Math.abs(A.d[i + 1]! - B.d[i + 1]!) + Math.abs(A.d[i + 2]! - B.d[i + 2]!) > 24) n++; out.push(n); } return out; },
       {box: [...BOX], pairs: [CHARACTERS.a, CHARACTERS.b, CHARACTERS.m].map(c => ({on: faceFragment(c, 'neutral').fragment, off: faceFragment(c, 'neutral', {noKeyline: kind}).fragment}))});
     const hairFace = await keyChanges('hairFace'), faceNeck = await keyChanges('faceNeck');
-    stat['keylineChangesPixels'] = {hairFace, faceNeck, requireAtLeast: 100};
-
-    const pixelPass = (result: typeof features) => result.worst.fraction >= 0.85 && result.totalFraction >= 0.95;
-    const percent = (value: number) => `${(100 * value).toFixed(2)}%`;
-    const pixelValues = (result: typeof features) =>
-      `${percent(result.worst.fraction)} (${result.worst.id}), total ${percent(result.totalFraction)}`;
-    checks.push(
+    stat['keylineChangesPixels'] = {hairFace, faceNeck, requireAtLeast: KEYLINE_MIN_PIXELS};
+    checks.unshift(
       ...gated.map(({criterion, pass, value}) => ({criterion, pass, value})),
-      {criterion: '⑤ Feature lines ≥ 85% each and ≥ 95% overall, control fails',
-        pass: pixelPass(features) && !pixelPass(control),
-        value: `${pixelValues(features)}; control: ${pixelValues(control)}`},
-      {criterion: '⑥ Boundary keylines change ≥ 100 px each',
-        pass: [...hairFace, ...faceNeck].every(pixels => pixels >= 100),
-        value: `hair/face: ${hairFace.join(', ')} px; face/neck: ${faceNeck.join(', ')} px`},
+      ...judgePixels(features, control, {hairFace, faceNeck}),
     );
   } finally {
     await br.close();
@@ -216,13 +217,18 @@ async function measure(dir: string, check: boolean) {
   // 7. minimum stroke width at stage scale: every open line (fill none) is >= 2.8 units (1 px at 0.36)
   const strokes = (frag: string) => [...frag.matchAll(/<(?:path|ellipse|circle)[^>]*?fill="none"[^>]*?stroke-width="([0-9.]+)"/g)].map(x => Number(x[1]));
   const minStroke = Math.min(...[a, b, m].flatMap(x => Object.values(x.expressions).flatMap(f => strokes(f!))));
-  stat['minStrokeUnits'] = {min: minStroke, px: r1(minStroke * SCALE), ok: minStroke * SCALE >= 1};
+  const strokeOk = Number.isFinite(minStroke) && minStroke * SCALE >= 1;
+  stat['minStrokeUnits'] = {min: minStroke, px: r1(minStroke * SCALE), ok: strokeOk};
+  checks.push({criterion: 'Minimum open stroke ≥ 1 px at stage scale', pass: strokeOk,
+    value: Number.isFinite(minStroke) ? `${minStroke} units / ${minStroke * SCALE} px` : 'No open strokes found'});
 
   // 8. the sampler: first-draw validity, repair, totality; the coarse grid; invalid input
   const N = 1000; let first = 0, repairedN = 0, invalidAfter = 0; const repairGroups: Record<string, number> = {};
   for (let i = 0; i < N; i++) { const d = randomCharacterDetailed(i); if (d.firstDrawValid) first++; else { repairedN++; for (const g of d.repaired) repairGroups[g] = (repairGroups[g] ?? 0) + 1; } if (validate(d.character).length) invalidAfter++; else assertLoads(toManifest(d.character)); }
   stat['randomSeeds'] = {generator: GENERATOR, tried: N, firstDrawValid: first, firstDrawRate: `${(first / N * 100).toFixed(1)}%`, repaired: repairedN, repairedGroups: repairGroups, invalidAfterRepair: invalidAfter};
-  const seed7 = JSON.stringify(randomCharacter(7)); stat['seedStable'] = seed7 === JSON.stringify(randomCharacter(7));
+  const seed7 = JSON.stringify(randomCharacter(7));
+  const seedStable = seed7 === JSON.stringify(randomCharacter(7));
+  stat['seedStable'] = seedStable;
   stat['seedSnapshot'] = Object.fromEntries([0, 1, 2].map(i => { const c = randomCharacter(i); return [String(i), `cheek ${c.head.cheek} chin ${c.head.chin} jaw ${c.head.jaw} eyes ${c.eyes.w}x${c.eyes.h} ${c.hair.template}/${c.hair.strands} ${c.palette.skin}/${c.palette.hair}`]; }));
   // coarse grid: 'normalize' applies the dependent constraints; how much of the grid is still invalid, and why
   let gridN = 0, gridBad = 0; const gridWhy: Record<string, number> = {};
@@ -231,6 +237,9 @@ async function measure(dir: string, check: boolean) {
     gridN++; const bad = validate(c); if (bad.length) { gridBad++; for (const x of new Set(bad.map(v => v.message.replace(/^[a-z]+: /, '').replace(/[-0-9.]+/g, '#').slice(0, 45)))) gridWhy[x] = (gridWhy[x] ?? 0) + 1; }
   }
   stat['coarseGrid'] = {points: gridN, invalid: gridBad, rate: `${(gridBad / gridN * 100).toFixed(1)}%`, why: gridWhy};
+  checks.push({criterion: 'Sampler validity and determinism',
+    pass: first / N >= 0.99 && invalidAfter === 0 && gridBad === 0 && seedStable,
+    value: `${first}/${N} valid first draws (≥ 99%), ${invalidAfter} invalid after repair, ${gridBad}/${gridN} invalid grid points, seed stable: ${seedStable}`});
   const invalidMessages = (character: Character): string[] => validate(character).map(violation => violation.message);
   stat['invalidInputs'] = {strands0: invalidMessages({...CHARACTERS.a, hair: {...CHARACTERS.a.hair, strands: 0}}),
     chin110: invalidMessages({...CHARACTERS.a, head: {...CHARACTERS.a.head, chin: 110}}),
@@ -260,7 +269,10 @@ async function measure(dir: string, check: boolean) {
   const render = () => renderInBrowser(diagram({theme: 'blue', title: sample.title, width: 780, legend: false}).add(comic(sample, {aspect: '6:5', characters: {'mf-a': a, 'mf-b': b}})), {measure: hb});
   const c1 = await render(), c2 = await render();
   fs.writeFileSync(path.join(dir, 'comic-sample.svg'), c1.svg);
-  stat['comic'] = {deterministic: c1.svg === c2.svg, svgBytes: bytes(c1.svg), verdictOk: c1.verdict.ok, faces: (c1.svg.match(/data-character=/g) ?? []).length};
+  const comicDeterministic = c1.svg === c2.svg;
+  stat['comic'] = {deterministic: comicDeterministic, svgBytes: bytes(c1.svg), verdictOk: c1.verdict.ok, faces: (c1.svg.match(/data-character=/g) ?? []).length};
+  checks.push({criterion: 'Comic sample renders twice with a passing verdict', pass: c1.verdict.ok && c2.verdict.ok && comicDeterministic,
+    value: `Verdicts: ${c1.verdict.ok}, ${c2.verdict.ok}, identical: ${comicDeterministic}`});
 
   // 10. swap compatibility (ADR 0079 D7): 1x2 with two stacked bubbles per panel, lines of 8..66 characters; built-in vs manga (no tuft, with a side tuft, mature)
   const tuft: Character = {...structuredClone(CHARACTERS.a), id: 'mf-t', hair: {...CHARACTERS.a.hair, ahoge: 'right'}};
@@ -283,6 +295,8 @@ async function measure(dir: string, check: boolean) {
   }
   stat['swapCompatibility'] = {layouts: '1x2, 2x2, 1x3 (6:5)', lengths: '8..66 step 4', ...swap, regressions: regress};
   stat['topAnchors'] = {a: a.anchors.top, tuft: mt.anchors.top, b: b.anchors.top, mature: m.anchors.top, limit: 23};
+  checks.push({criterion: 'Replacing built-in faces adds no comic failures', pass: regress.length === 0,
+    value: regress.length ? regress.join(', ') : '0 regressions'});
 
   stat['checks'] = checks;
   fs.writeFileSync(path.join(dir, 'measurements.json'), `${JSON.stringify(stat, null, 2)}\n`);

@@ -7,6 +7,9 @@ export interface Person {
 
 export type Distribution = Record<'showcase' | 'random' | 'extremes', readonly Person[]>;
 
+export const FEATURE_MIN_FRACTION = 0.85;
+export const KEYLINE_MIN_PIXELS = 100;
+
 export const median = (sorted: readonly number[]): number => {
   const middle = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
@@ -46,5 +49,28 @@ export function judge({showcase, random, extremes}: Distribution) {
       value: (worstRelative.ratio < 0.5 ? relative.filter(person => person.ratio < 0.5) : [worstRelative])
         .map(person => `${display(person)} / ${person.median.toFixed(3)} = ${person.ratio.toFixed(3)}`).join(', ')},
     {criterion: '④ Distribution reported', pass: true, value: `${showcase.length} showcase, ${random.length} random, ${extremes.length} palette`, distribution},
+  ] as const;
+}
+
+interface FeaturePixels {
+  worst: {id: string; fraction: number};
+  totalFraction: number;
+}
+
+export function judgePixels(features: FeaturePixels, control: FeaturePixels,
+  {hairFace, faceNeck}: {hairFace: readonly number[]; faceNeck: readonly number[]}) {
+  const passesContrast = ({worst, totalFraction}: FeaturePixels) =>
+    worst.fraction >= FEATURE_MIN_FRACTION && totalFraction >= 0.95;
+  const percent = (value: number) => `${(100 * value).toFixed(2)}%`;
+  const displayPixels = ({worst, totalFraction}: FeaturePixels) =>
+    `${percent(worst.fraction)} (${worst.id}), total ${percent(totalFraction)}`;
+
+  return [
+    {criterion: '⑤ Feature lines ≥ 85% each and ≥ 95% overall, control fails',
+      pass: passesContrast(features) && !passesContrast(control),
+      value: `${displayPixels(features)}; control: ${displayPixels(control)}`},
+    {criterion: '⑥ Boundary keylines change ≥ 100 px each',
+      pass: [...hairFace, ...faceNeck].every(pixels => pixels >= KEYLINE_MIN_PIXELS),
+      value: `hair/face: ${hairFace.join(', ')} px; face/neck: ${faceNeck.join(', ')} px`},
   ] as const;
 }

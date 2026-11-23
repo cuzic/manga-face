@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {judge} from '../tools/measure.ts';
+import {judge} from '../tools/measure-check.ts';
 
 const person = (id: string, min: number, median: number) => ({id, min, median, pair: 'neutral/think'});
 const valid = {
@@ -35,3 +35,12 @@ test('③ compares each person’s minimum to their own median', () => {
   assert.ok(a.pass && b.pass);
   assert.equal(c.pass, false);
 });
+
+for (const [group, id] of [['random', '0'], ['extremes', 'm/dark/black']] as const) {
+  test(`③ rejects a collapsed pair in ${group} above the absolute floor`, () => {
+    const [a, b, c] = judge({...valid, [group]: [person(id, 3.6, 8)]});
+    assert.ok(a.pass && b.pass);
+    assert.equal(c.pass, false);
+    assert.match(c.value, /3\.600 \(neutral\/think\) \/ 8\.000 = 0\.450/);
+  });
+}
