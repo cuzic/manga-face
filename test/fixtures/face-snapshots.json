@@ -102,8 +102,8 @@
     "{\"id\":\"mf-99\",\"name\":\"99\",\"nose\":\"line\",\"palette\":{\"skin\":\"dark\",\"hair\":\"blond\",\"top\":\"purple\",\"iris\":\"green\"},\"head\":{\"cheek\":80,\"chin\":97,\"jaw\":0.75,\"chinW\":2},\"eyes\":{\"w\":20,\"h\":22,\"tilt\":2,\"iris\":1.1,\"y\":20,\"gap\":39,\"lashes\":true,\"lidW\":6},\"brows\":{\"thick\":4.5,\"dy\":2},\"mouth\":{\"w\":18,\"y\":64},\"hair\":{\"template\":\"short\",\"strands\":4,\"parting\":0,\"ahoge\":\"none\",\"highlight\":true,\"sideLen\":34}}"
   ],
   "manifests": {
-    "a": "b16345f710309d4dab0e5cad880e30266c09e21ea549d8876110a41cf790d1a2",
-    "b": "2bdf0bbebdaaa7b4862c61a599c1f113e025707d38debc043ff788ca2d4d0d8a",
-    "m": "3d96aabcfbaa945cca808a72e6b295cb7ebe4b29a79eb634db94af67ced540fc"
+    "a": "1f252d1a07473120df5f54e870b2307615f7e2d7b542d2e073ee2291e436ad5f",
+    "b": "c618b935f927f1c6f799cd62121803bb1611c23486ac84a0fa7bd4c6606c9117",
+    "m": "c9e6a7a77d1afe9161ddbbe4ed77d4b521380febe58bd1801e792bedea804ce2"
   }
 }
