@@ -126,7 +126,9 @@ def main(p1, p2, outdir, expression=None, *, reference_image, record=None, fixtu
         'baseline_residual_px_by_landmark': {n: round(float(r), 1) for n, r, p in zip(names, r0, present) if p},
         'character': norm1,
     }
-    (out / 'fit.json').write_text(json.dumps(result, indent=2) + '\n')
+    fit_file = out / 'fit.json'
+    fit_file.write_text(json.dumps(result, indent=2) + '\n')
+    (out / 'derived.json').write_text(json.dumps({'derived': [{**identity, 'artifact': fit_file.name}]}, indent=2) + '\n')
     print(json.dumps({k: result[k] for k in ['expression', 'nfev', 'baseline_young_default', 'fitted', 'scale_px_per_model_unit', 'drawn_params', 'clamped_by', 'at_bound']}, indent=2))
     print('worst:', sorted(result['residual_px_by_landmark'].items(), key=lambda kv: -kv[1])[:6])
 
