@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {prefixIds} from '../src/ids.ts';
-import {ADR0074, BOX, CHARACTERS, SCALE, faceFragment, type Character} from '../src/face.ts';
+import {ADR0074, BOX, CHARACTERS, SCALE, faceFragment, type Character} from '../src/index.ts';
 
 const bobOf = (c: Character, id: string): Character => ({...structuredClone(c), id, mirror: false, hair: {...c.hair, template: 'bob', parting: -0.5}, palette: {...c.palette, hair: 'black', skin: 'medium', top: 'red', iris: 'brown'}});
 const rows: {label: string; sub: string; ch: Character}[] = [
