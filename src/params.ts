@@ -20,6 +20,7 @@ export const RANGES = {
   'hair.strands': [1, 9, 1], 'hair.parting': [-1, 1, 0.25], 'hair.sideLen': [16, 40, 2],
 } as const satisfies Record<string, readonly [number, number, number]>;
 export type RangeKey = keyof typeof RANGES;
+export type ParameterRanges = Record<RangeKey, readonly [number, number, number]>;
 type RangeGroup = RangeKey extends `${infer Group}.${string}` ? Group : never;
 const rangeField = (key: RangeKey): [RangeGroup, string] => key.split('.') as [RangeGroup, string];
 export function get(c: Base, key: RangeKey): number {
@@ -40,18 +41,22 @@ const EYE_WMUL_MAX = 1.08, MOUTH_WMUL_MAX = 2.6;
  * Returns a copy. What still breaks an invariant (a range that cannot hold both bounds) is reported by `validate`.
  */
 export function normalize<T extends Base>(ch: T): T {
+  return normalizeWithRanges(ch, RANGES);
+}
+
+export function normalizeWithRanges<T extends Base>(ch: T, ranges: ParameterRanges): T {
   const c = structuredClone(ch);
-  for (const k of Object.keys(RANGES) as RangeKey[]) set(c, k, clamp(get(c, k), RANGES[k]));
+  for (const k of Object.keys(ranges) as RangeKey[]) set(c, k, clamp(get(c, k), ranges[k]));
   // the face stays inside the head circle: lower the jaw's roundness, then the cheek, until it does
   const inCircle = (): boolean => Math.max(...flatten(faceSegs(c.head)).filter(p => p[1] > CY - 20).map(p => Math.sqrt((p[0] - CX) * (p[0] - CX) + (p[1] - CY) * (p[1] - CY)))) <= HEAD_R + 0.5;
   while (!inCircle() && c.head.jaw >= 0.05) c.head.jaw = Math.round((c.head.jaw - 0.05) * 100) / 100;
-  while (!inCircle() && c.head.cheek > RANGES['head.cheek'][0]) c.head.cheek -= 2;
+  while (!inCircle() && c.head.cheek > ranges['head.cheek'][0]) c.head.cheek -= 2;
   const poly = flatten(faceSegs(c.head));
-  c.mouth.y = Math.max(RANGES['mouth.y'][0], Math.min(c.mouth.y, c.head.chin - 30));
+  c.mouth.y = Math.max(ranges['mouth.y'][0], Math.min(c.mouth.y, c.head.chin - 30));
   const hwE = faceHalfWidth(poly, CY + c.eyes.y);
-  c.eyes.gap = Math.max(RANGES['eyes.gap'][0], Math.min(c.eyes.gap, Math.floor(hwE - 4 - (c.eyes.lashes ? LASH : 0) - 1 - RANGES['eyes.w'][0] * EYE_WMUL_MAX)));
-  c.eyes.w = Math.max(RANGES['eyes.w'][0], Math.min(c.eyes.w, Math.floor((hwE - 4 - (c.eyes.lashes ? LASH : 0) - c.eyes.gap - 1) / EYE_WMUL_MAX)));
+  c.eyes.gap = Math.max(ranges['eyes.gap'][0], Math.min(c.eyes.gap, Math.floor(hwE - 4 - (c.eyes.lashes ? LASH : 0) - 1 - ranges['eyes.w'][0] * EYE_WMUL_MAX)));
+  c.eyes.w = Math.max(ranges['eyes.w'][0], Math.min(c.eyes.w, Math.floor((hwE - 4 - (c.eyes.lashes ? LASH : 0) - c.eyes.gap - 1) / EYE_WMUL_MAX)));
   const hwM = faceHalfWidth(poly, CY + c.mouth.y);
-  c.mouth.w = Math.max(RANGES['mouth.w'][0], Math.min(c.mouth.w, Math.floor((hwM - 6) * 2 / MOUTH_WMUL_MAX)));
+  c.mouth.w = Math.max(ranges['mouth.w'][0], Math.min(c.mouth.w, Math.floor((hwM - 6) * 2 / MOUTH_WMUL_MAX)));
   return c;
 }

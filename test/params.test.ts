@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {CHARACTERS, RANGES, faceFragment, normalize, toManifest, validate, validateRaw} from '../src/index.ts';
 import type {Base, Character} from '../src/index.ts';
+import {normalizeWithRanges} from '../src/params.ts';
 
 test('normalize clamps and snaps every ranged parameter and is idempotent', () => {
   for (const [name, [min, max, step]] of Object.entries(RANGES)) {
@@ -38,27 +39,19 @@ test('normalize rounds the jaw and constrains the mouth at the parameter extreme
 test('normalize lowers the cheek when even the straightest jaw leaves the head circle', () => {
   const range = RANGES['head.cheek'];
   // The current maximum cheek already fits with jaw = 0. Widen the test range to exercise the fallback.
-  Object.assign(RANGES, {'head.cheek': [range[0], 100, range[2]]});
-  try {
-    const character = {...CHARACTERS.a, head: {cheek: 100, chin: 98, jaw: 1, chinW: 16}};
-    const normalized = normalize(character);
-    assert.deepEqual(normalized.head, {cheek: 96, chin: 98, jaw: 0, chinW: 16});
-    assert.deepEqual(validateRaw(normalized, []), []);
-  } finally {
-    Object.assign(RANGES, {'head.cheek': range});
-  }
+  const ranges = {...RANGES, 'head.cheek': [range[0], 100, range[2]]} as const;
+  const character = {...CHARACTERS.a, head: {cheek: 100, chin: 98, jaw: 1, chinW: 16}};
+  const normalized = normalizeWithRanges(character, ranges);
+  assert.deepEqual(normalized.head, {cheek: 96, chin: 98, jaw: 0, chinW: 16});
+  assert.deepEqual(validateRaw(normalized, []), []);
 });
 
 test('normalize keeps the minimum mouth height when the chin cap is lower', () => {
   const range = RANGES['head.chin'];
   // The current minimum chin yields a cap of 60. Lower the test minimum to move the cap below 58.
-  Object.assign(RANGES, {'head.chin': [86, range[1], range[2]]});
-  try {
-    const character = {...CHARACTERS.a, head: {...CHARACTERS.a.head, chin: 86}, mouth: {w: 48, y: 70}};
-    assert.equal(normalize(character).mouth.y, 58);
-  } finally {
-    Object.assign(RANGES, {'head.chin': range});
-  }
+  const ranges = {...RANGES, 'head.chin': [86, range[1], range[2]]} as const;
+  const character = {...CHARACTERS.a, head: {...CHARACTERS.a.head, chin: 86}, mouth: {w: 48, y: 70}};
+  assert.equal(normalizeWithRanges(character, ranges).mouth.y, 58);
 });
 
 test('toManifest uses the normalized values of an in-range off-step character', () => {
