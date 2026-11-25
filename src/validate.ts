@@ -3,8 +3,8 @@ import {faceFragmentRaw} from './fragment.ts';
 import {CX, CY, HEAD_R, faceHalfWidth, faceSegs, flatten, n, selfIntersects} from './geometry.ts';
 import {hairParts} from './hair.ts';
 import {HAIR, HEX, IRIS, SKIN, TOP} from './palette.ts';
-import {HAIR_TEMPLATES, RANGES, get, normalize} from './params.ts';
-import type {Character, RangeKey} from './params.ts';
+import {HAIR_TEMPLATES, RANGES, get, normalizeWithRanges} from './params.ts';
+import type {Character, ParameterRanges, RangeKey} from './params.ts';
 import {DIRECTIONS} from './styles.ts';
 
 export interface Violation {
@@ -18,13 +18,17 @@ const RANGE_EPSILON = 1e-9;
 
 /** Checks the original input ranges and palette, then the normalized geometry (ADR 0001 D2). */
 export function validate(ch: Character, expressions: readonly string[] = ADR0074): Violation[] {
+  return validateWithRanges(ch, RANGES, expressions);
+}
+
+export function validateWithRanges(ch: Character, ranges: ParameterRanges, expressions: readonly string[] = ADR0074): Violation[] {
   const out: Violation[] = [];
   let hasInvalidNumber = false;
-  if (!Number.isInteger(ch.hair.strands) || ch.hair.strands < 1) {
+  if (Number.isFinite(ch.hair.strands) && (!Number.isInteger(ch.hair.strands) || ch.hair.strands < 1)) {
     out.push({group: 'hair', code: 'strands', message: 'hair.strands must be an integer >= 1'});
   }
-  for (const key of Object.keys(RANGES) as RangeKey[]) {
-    const v = get(ch, key), [lo, hi] = RANGES[key];
+  for (const key of Object.keys(ranges) as RangeKey[]) {
+    const v = get(ch, key), [lo, hi] = ranges[key];
     const group = key.split('.')[0] as Violation['group'];
     if (!Number.isFinite(v)) {
       hasInvalidNumber = true;
@@ -41,7 +45,7 @@ export function validate(ch: Character, expressions: readonly string[] = ADR0074
     }
   }
   if (hasInvalidNumber || out.some(violation => violation.group === 'palette')) return out;
-  return out.concat(validateRaw(normalize(ch), expressions));
+  return out.concat(validateRaw(normalizeWithRanges(ch, ranges), expressions));
 }
 
 /** Checks the supplied geometry without applying ranges or dependent constraints. */

@@ -56,7 +56,14 @@ test('validate rejects NaN strands and numeric strings as invalid numbers', () =
     {group: 'head', code: 'range', message: 'head.cheek must be a finite number'},
   ]);
   assert.deepEqual(validate(nanStrands), [
-    {group: 'hair', code: 'strands', message: 'hair.strands must be an integer >= 1'},
+    {group: 'hair', code: 'range', message: 'hair.strands must be a finite number'},
+  ]);
+});
+
+test('validate skips geometry when a numeric field is NaN', () => {
+  const character = {...a, hair: {...a.hair, strands: NaN}, brows: {thick: 9, dy: 8}};
+  assert.ok(validateRaw(normalize(character), ['angry']).some(violation => violation.code === 'brow-into-eye'));
+  assert.deepEqual(validate(character, ['angry']), [
     {group: 'hair', code: 'range', message: 'hair.strands must be a finite number'},
   ]);
 });
