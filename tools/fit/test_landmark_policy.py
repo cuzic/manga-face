@@ -37,7 +37,8 @@ def occluded():
 
 
 def reading(score, configuration=CONFIG, size=(408, 408), fixture="neutral"):
-    return {"fixture": fixture, "png_sha256": "png-" + fixture, "sent_configuration_sha256": configuration,
+    svg = landmark_calibration.generated_files().get(f"{fixture}.svg", b"")
+    return {"fixture": fixture, "png_sha256": "png-" + fixture, "svg_sha256": hashlib.sha256(svg).hexdigest(), "sent_configuration_sha256": configuration,
             "size": list(size), "metrics": score}
 
 
@@ -50,7 +51,7 @@ def make_report(readings):
 
 
 def good_readings():
-    return [reading(metrics()), reading(metrics()), reading(occluded(), fixture="hidden"), reading(occluded(), fixture="hidden")]
+    return [reading(metrics()), reading(metrics()), reading(occluded(), fixture="scaled-occluded"), reading(occluded(), fixture="scaled-occluded")]
 
 
 def make_inputs():
@@ -205,11 +206,15 @@ class ReportBindingTest(unittest.TestCase):
             return subprocess.CompletedProcess(command, 0, json.dumps({**reply, "inference_id": f"id-{len(calls)}"}), "")
 
         with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            landmark_calibration.generate(root)
             with patch.object(run_landmark_calibration, "checked_fixtures", return_value=[fixture]), \
                     patch("vision_checkpoint.subprocess.run", side_effect=adapter):
-                report = run_landmark_calibration.evaluate(Path(directory), "model", ["mock"], Path(directory) / "checkpoint", ["neutral"])
+                report = run_landmark_calibration.evaluate(root, "model", ["mock"], root / "checkpoint", ["neutral"])
+            files = {path.name: path.read_bytes() for path in root.iterdir()
+                     if path.suffix == ".svg" or path.name.endswith(".truth.json")}
         self.assertEqual(report["fixture_set"], {
-            "truth_sha256": landmark_calibration.fixture_truth_digest(),
+            "truth_sha256": landmark_calibration.truth_digest(files),
             "raster_sha256": landmark_calibration.raster_digest({"neutral": "png-test"})})
 
     def test_digest_changes_with_the_fixtures(self):
@@ -218,6 +223,122 @@ class ReportBindingTest(unittest.TestCase):
         self.assertEqual(before, landmark_calibration.fixture_truth_digest())
         with patch.dict(landmark_calibration.POINTS, {"chin": (161, 224)}):
             self.assertNotEqual(before, landmark_calibration.fixture_truth_digest())
+
+
+class StaleFixtureTest(unittest.TestCase):
+    """A report scored on an older or altered fixture directory must not qualify points."""
+
+    def render(self, root):
+        # Stand-in for render_landmark_fixtures.ts: any PNG, bound to its SVG by `.raster.json`.
+        for svg in sorted(root.glob("*.svg")):
+            image = Image.new("RGB", (408, 408), "white")
+            image.putpixel((len(svg.stem), 1), (0, 0, 0))
+            image.save(svg.with_suffix(".png"))
+            svg.with_suffix(".raster.json").write_text(json.dumps({
+                "svg_sha256": hashlib.sha256(svg.read_bytes()).hexdigest(),
+                "png_sha256": hashlib.sha256(svg.with_suffix(".png").read_bytes()).hexdigest()}) + "\n")
+
+    def make_fixtures(self, stale=False):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        root = Path(temp.name)
+        landmark_calibration.generate(root)
+        if stale:
+            # An older revision: SVG changed, chin truth moved 30 px, everything else rebound consistently.
+            for name in landmark_calibration.BASE_CASES:
+                svg = root / f"{name}.svg"
+                svg.write_text(svg.read_text().replace("</svg>", "<!-- older revision --></svg>"))
+                truth_path = root / f"{name}.truth.json"
+                truth = json.loads(truth_path.read_text())
+                truth["image_sha256"] = hashlib.sha256(svg.read_bytes()).hexdigest()
+                truth["points"]["chin"][1] += 30
+                truth_path.write_text(json.dumps(truth, indent=2) + "\n")
+        self.render(root)
+        return root
+
+    def adapter(self):
+        names = landmark_inference.DEFINITIONS
+        calls = []
+
+        def call(command, **kwargs):
+            calls.append(command)
+            reply = {"model_version": "model", "inference_id": f"id-{len(calls)}",
+                     "points": dict.fromkeys(names, [100, 100]), "missing": {}}
+            return subprocess.CompletedProcess(command, 0, json.dumps(reply), "")
+
+        return patch("vision_checkpoint.subprocess.run", side_effect=call), calls
+
+    def test_current_fixtures_are_accepted(self):
+        import run_landmark_calibration
+
+        root = self.make_fixtures()
+        inputs = run_landmark_calibration.checked_fixtures(root, "model", landmark_calibration.BASE_CASES)
+        self.assertEqual([item[0] for item in inputs], list(landmark_calibration.BASE_CASES))
+
+    def test_stale_fixture_directory_is_refused_before_any_call(self):
+        import run_landmark_calibration
+
+        root = self.make_fixtures(stale=True)
+        patched, calls = self.adapter()
+        with patched, self.assertRaisesRegex(ValueError, "current generator"):
+            run_landmark_calibration.evaluate(root, "model", ["mock"], root / "checkpoint")
+        self.assertEqual(calls, [])
+
+    def test_truth_digest_describes_the_files_that_were_read(self):
+        import run_landmark_calibration
+
+        root = self.make_fixtures(stale=True)
+        patched, _ = self.adapter()
+        definitions = landmark_inference.definitions_for("neutral")
+
+        def unchecked(fixtures, model, cases):
+            # Bypass the staleness check to see what the report would claim for the stale directory.
+            return [(name, json.loads((fixtures / f"{name}.truth.json").read_text()),
+                     json.loads((fixtures / f"{name}.raster.json").read_text()),
+                     {"size": [408, 408], "prompt": "p"}, definitions) for name in cases]
+
+        with patched, patch.object(run_landmark_calibration, "checked_fixtures", unchecked):
+            report = run_landmark_calibration.evaluate(root, "model", ["mock"], root / "checkpoint")
+        self.assertNotEqual(report["fixture_set"]["truth_sha256"], landmark_calibration.fixture_truth_digest())
+        first, second, zoom, _ = make_inputs()
+        with self.assertRaisesRegex(ValueError, "fixture set"):
+            qualified_points(first, second, zoom, {**report, "invalid_responses": 0})
+
+    def test_each_checked_fixtures_binding_is_enforced(self):
+        import run_landmark_calibration
+
+        cases = ("neutral",)
+        root = self.make_fixtures()
+        raster = root / "neutral.raster.json"
+        original = raster.read_text()
+        raster.write_text(json.dumps({**json.loads(original), "png_sha256": "0" * 64}))
+        with self.assertRaisesRegex(ValueError, "raster changed"):
+            run_landmark_calibration.checked_fixtures(root, "model", cases)
+        raster.write_text(original)
+        (root / "neutral.png").write_bytes((root / "neutral.png").read_bytes() + b"x")
+        with self.assertRaisesRegex(ValueError, "raster changed"):
+            run_landmark_calibration.checked_fixtures(root, "model", cases)
+
+        # If the generator itself changed, the SVG must still match the hash its truth file names.
+        root = self.make_fixtures()
+        truth_path = root / "neutral.truth.json"
+        truth = json.loads(truth_path.read_text())
+        truth["image_sha256"] = "0" * 64
+        truth_path.write_text(json.dumps(truth, indent=2) + "\n")
+        current = landmark_calibration.generated_files()
+        current["neutral.truth.json"] = truth_path.read_bytes()
+        with patch.object(landmark_calibration, "generated_files", return_value=current), \
+                self.assertRaisesRegex(ValueError, "SVG changed"):
+            run_landmark_calibration.checked_fixtures(root, "model", cases)
+
+    def test_every_reading_must_match_the_fixture_map(self):
+        for field in ("png_sha256", "svg_sha256"):
+            with self.subTest(field=field):
+                first, second, zoom, report = make_inputs()
+                self.assertEqual(report["readings"][2]["fixture"], report["readings"][3]["fixture"])
+                report["readings"][3][field] = "0" * 64  # a later reading of the same fixture
+                with self.assertRaisesRegex(ValueError, "fixture set"):
+                    qualified_points(first, second, zoom, report)
 
 
 class AiFitTest(unittest.TestCase):

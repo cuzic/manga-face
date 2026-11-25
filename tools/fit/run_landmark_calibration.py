@@ -25,11 +25,20 @@ def calibration_lock(output):
         yield
 
 
+def read_truth_files(fixtures):
+    """Bytes of every SVG and truth file the current generator writes, read from `fixtures`."""
+    return {name: (fixtures / name).read_bytes() for name in calibration.generated_files()}
+
+
 def checked_fixtures(fixtures, model, cases):
     inputs = []
+    current = calibration.generated_files()
     for name in cases:
         svg = fixtures / f"{name}.svg"
-        truth = json.loads(svg.with_suffix(".truth.json").read_text())
+        truth_path = svg.with_suffix(".truth.json")
+        if (svg.read_bytes() != current[svg.name] or truth_path.read_bytes() != current[truth_path.name]):
+            raise ValueError(f"fixture is not what the current generator writes: {name}; generate the fixtures again")
+        truth = json.loads(truth_path.read_text())
         png = svg.with_suffix(".png").read_bytes()
         raster = {
             "svg_sha256": hashlib.sha256(svg.read_bytes()).hexdigest(),
@@ -96,7 +105,7 @@ def evaluate(fixtures, model, adapter, checkpoint, cases=calibration.BASE_CASES)
             })
     return {
         "model_version": model,
-        "fixture_set": {"truth_sha256": calibration.fixture_truth_digest(),
+        "fixture_set": {"truth_sha256": calibration.truth_digest(read_truth_files(fixtures)),
                         "raster_sha256": calibration.raster_digest(
                             {name: raster["png_sha256"] for name, _, raster, _, _ in inputs})},
         "readings": scores,

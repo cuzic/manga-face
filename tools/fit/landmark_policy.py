@@ -1,7 +1,8 @@
 """Apply the R4 calibration and zoom checks before a reference fit."""
+import hashlib
 import math
 
-from landmark_calibration import fixture_truth_digest, raster_digest, summarize
+from landmark_calibration import generated_files, raster_digest, summarize, truth_digest
 from vision_checkpoint import digest
 
 OCCLUSION_REQUIRED = {"cheekL", "cheekR", "earL", "earR", "eyeL_outer", "eyeR_outer", "browL", "browR"}
@@ -15,9 +16,15 @@ def qualified_points(first, second, zoom, report):
         raise ValueError("fit needs a calibration report without invalid responses")
     fixture_set = report.get("fixture_set") or {}
     rasters = {}
+    current = generated_files()
     for reading in report["readings"]:
-        rasters.setdefault(reading.get("fixture"), reading.get("png_sha256"))
-    if (fixture_set.get("truth_sha256") != fixture_truth_digest()
+        name = reading.get("fixture")
+        # Every reading of a fixture must carry the same raster, and the SVG the current generator writes.
+        if (rasters.setdefault(name, reading.get("png_sha256")) != reading.get("png_sha256")
+               
+                or reading.get("svg_sha256") != hashlib.sha256(current.get(f"{name}.svg", b"")).hexdigest()):
+            raise ValueError("calibration report was made for a different fixture set; calibrate again")
+    if (fixture_set.get("truth_sha256") != truth_digest(current)
             or fixture_set.get("raster_sha256") != raster_digest(rasters)):
         raise ValueError("calibration report was made for a different fixture set; calibrate again")
     model = first["model_version"]

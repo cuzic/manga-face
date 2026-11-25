@@ -1,3 +1,4 @@
+import base64
 import copy
 import hashlib
 from io import BytesIO, StringIO
@@ -115,7 +116,10 @@ class RunBindingTest(unittest.TestCase):
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
         self.image = self.root / "sheet.png"
-        Image.new("RGB", (32, 32), "white").save(self.image)
+        sheet = Image.new("RGB", (32, 32), "white")
+        sheet.paste((0, 0, 0), (2, 2, 9, 9))
+        sheet.paste((120, 120, 120), (20, 20, 30, 30))
+        sheet.save(self.image)
         self.record = self.root / "reviewed.json"
         cell = {"position": 0, "expression": "neutral", "review": "accepted"}
         self.record.write_text(json.dumps({"id": "synthetic", "kind": "ai-generated", "domain": "young",
@@ -128,10 +132,12 @@ class RunBindingTest(unittest.TestCase):
                          "cell_size": [16, 16], "cells": [{**cell, "origin": [0, 0]}]}
         self.manifest.write_text(json.dumps(self.prepared))
         self.sizes = []
+        self.requests = []
 
     def adapter(self, **changes):
         def call(command, *, input, **kwargs):
             request = json.loads(input)
+            self.requests.append(request)
             self.sizes.append(request["size"])
             zoomed = request["size"] == [32, 32]
             result = {"model_version": "test-v1", "inference_id": f"call-{len(self.sizes)}",
@@ -156,6 +162,16 @@ class RunBindingTest(unittest.TestCase):
         self.assertEqual(readings["zoom"]["points"], readings["1"]["points"])
         self.assertEqual(readings["zoom"]["source_size"], [32, 32])
         self.assertEqual(readings["1"]["record_sha256"], self.prepared["record_sha256"])
+
+    def test_zoom_request_is_the_cell_cropped_and_doubled(self):
+        with self.adapter():
+            self.run_tool()
+        sheet = Image.open(self.image).convert("RGB")
+        cell = sheet.crop((0, 0, 16, 16))
+        expected = {"1": cell, "zoom": cell.resize((32, 32), Image.Resampling.LANCZOS)}
+        for request, name in ((self.requests[0], "1"), (self.requests[2], "zoom")):
+            sent = Image.open(BytesIO(base64.b64decode(request["image_png_base64"]))).convert("RGB")
+            self.assertEqual(sent.tobytes(), expected[name].tobytes(), name)
 
     def test_record_path_is_explicit_and_the_sibling_name_is_only_a_default(self):
         with self.adapter():
@@ -224,6 +240,44 @@ class OpenAiAdapterTest(unittest.TestCase):
         self.assertEqual(actual["sent_request_sha256"], hashlib.sha256(post.call_args.args[0].data).hexdigest())
         self.assertEqual(actual["points"], {"chin": [2, 3]})
         self.assertEqual(actual["usage"], {"input_tokens": 256, "cached_input_tokens": 32, "output_tokens": 121})
+
+    def reading(self, item, model="test-v1"):
+        return {"status": "completed", "model": model, "id": "response-one", "output": [
+            {"type": "message", "content": [{"type": "output_text", "text": json.dumps({"chin": item})}]}]}
+
+    def test_parse_reading_contract(self):
+        parse = openai_landmark_adapter.parse_reading
+        ok = {"x": 2, "y": 3, "reason": None}
+        self.assertEqual(parse(self.reading(ok), "test-v1", ["chin"])["points"], {"chin": [2, 3]})
+        self.assertEqual(parse(self.reading({"x": None, "y": None, "reason": "hidden"}), "test-v1", ["chin"])["missing"],
+                         {"chin": "hidden"})
+        with self.assertRaisesRegex(ValueError, "configured model"):
+            parse(self.reading(ok, model="test-v2"), "test-v1", ["chin"])
+        inconsistent = {
+            "x only": {"x": 2, "y": None, "reason": None},
+            "y only": {"x": None, "y": 3, "reason": None},
+            "x null with reason": {"x": None, "y": 3, "reason": "hidden"},
+            "y null with reason": {"x": 2, "y": None, "reason": "hidden"},
+            "null without reason": {"x": None, "y": None, "reason": None},
+            "null with blank reason": {"x": None, "y": None, "reason": " "},
+            "point with reason": {"x": 2, "y": 3, "reason": "hidden"},
+        }
+        for name, item in inconsistent.items():
+            with self.subTest(name):
+                with self.assertRaisesRegex(ValueError, "inconsistent"):
+                    parse(self.reading(item), "test-v1", ["chin"])
+
+    def test_configuration_hash_ignores_image_and_size(self):
+        def sent(image, size):
+            task = {"model_version": "test-v1", "size": size,
+                    "prompt": 'Read landmarks.\n{"chin":"lowest point"}', "image_png_base64": image}
+            with patch.object(openai_landmark_adapter, "urlopen",
+                              return_value=StringIO(json.dumps(self.reading({"x": 1, "y": 1, "reason": None})))):
+                return openai_landmark_adapter.main(task, "test-key")
+
+        small, large = sent("AAAA", [16, 16]), sent("BBBBBBBB", [32, 32])
+        self.assertEqual(small["sent_configuration_sha256"], large["sent_configuration_sha256"])
+        self.assertNotEqual(small["sent_request_sha256"], large["sent_request_sha256"])
 
     def test_rejects_refusal(self):
         result = {"status": "completed", "model": "test-v1", "output": [
@@ -332,6 +386,26 @@ class CheckpointAndPolicyTest(unittest.TestCase):
                     read_or_attempt(root, "pass-2", {}, {}, ["mock"])
                 adapter.assert_called_once()
 
+    def test_calibration_refuses_an_adapter_that_repeats_an_inference_id(self):
+        names = landmark_inference.DEFINITIONS
+        truth = {"size": [16, 16], "image_sha256": "test", "points": dict.fromkeys(names, [1, 1]), "missing": []}
+        fixture = ("neutral", truth, {"svg_sha256": "test", "png_sha256": "test"}, {"size": [16, 16], "prompt": "test"}, names)
+
+        def reply(command, **kwargs):
+            response = {"model_version": "model", "inference_id": "same-id",
+                        "points": dict.fromkeys(names, [1, 1]), "missing": {}}
+            return subprocess.CompletedProcess(command, 0, json.dumps(response), "")
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.object(run_landmark_calibration, "checked_fixtures", return_value=[fixture]), \
+                    patch.object(run_landmark_calibration, "read_truth_files", return_value={}), \
+                    patch("vision_checkpoint.subprocess.run", side_effect=reply):
+                report = run_landmark_calibration.evaluate(root, "model", ["mock"], root / "checkpoint", ["neutral"])
+        self.assertEqual([reading["error"] is None for reading in report["readings"]], [True, False])
+        self.assertEqual(report["invalid_responses"], 1)
+        self.assertEqual(report["readings"][1]["prediction"]["points"], {})
+
     def test_neutral_and_expression_side_occlusions_exist_for_both_sides(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -362,7 +436,8 @@ class CheckpointAndPolicyTest(unittest.TestCase):
                 return subprocess.CompletedProcess(command, 0, json.dumps(response), "")
 
             run = run_landmark_calibration.run_report
-            with patch.object(run_landmark_calibration, "checked_fixtures", return_value=[fixture]):
+            with patch.object(run_landmark_calibration, "checked_fixtures", return_value=[fixture]), \
+                    patch.object(run_landmark_calibration, "read_truth_files", return_value={}):
                 with patch("vision_checkpoint.subprocess.run", side_effect=reply):
                     first = run(root, "model", ["mock"], output, ["neutral"])
                     self.assertEqual(first["invalid_responses"], 1)

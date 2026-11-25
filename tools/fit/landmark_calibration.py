@@ -107,17 +107,27 @@ def score(truth, prediction):
     }
 
 
-def fixture_truth_digest():
-    """Digest of the fixtures `generate` writes now (SVG and truth bytes of every case)."""
+def generated_files():
+    """{file name: bytes} of the SVG and truth files `generate` writes now (every case)."""
     import tempfile
 
     with tempfile.TemporaryDirectory(prefix="r4-fixtures-") as directory:
         root = Path(directory)
         generate(root)
-        return hashlib.sha256(json.dumps({
-            path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-            for path in sorted(root.iterdir()) if path.suffix == ".svg" or path.name.endswith(".truth.json")
-        }, sort_keys=True).encode()).hexdigest()
+        return {path.name: path.read_bytes() for path in sorted(root.iterdir())
+                if path.suffix == ".svg" or path.name.endswith(".truth.json")}
+
+
+def truth_digest(files):
+    """Digest of {file name: bytes}; pass the bytes that were actually read."""
+    return hashlib.sha256(json.dumps({
+        name: hashlib.sha256(content).hexdigest() for name, content in files.items()
+    }, sort_keys=True).encode()).hexdigest()
+
+
+def fixture_truth_digest():
+    """Digest of the fixtures `generate` writes now."""
+    return truth_digest(generated_files())
 
 
 def raster_digest(rasters):
