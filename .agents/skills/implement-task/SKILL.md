@@ -1,6 +1,6 @@
 ---
 name: implement-task
-description: manga-face の [codex] タスク仕様(Issue、または PR の「## [codex] タスク仕様」コメント)を実装して PR を出す手順。タスク仕様を渡されたとき、レビュー指摘(docs/reviews/prNN-roundK.md)を直すとき、PR に main を取り込むときに使う。
+description: manga-face の [impl] タスク仕様(Issue、または PR の「## [impl] タスク仕様」コメント)を実装して PR を出す手順。タスク仕様を渡されたとき、レビュー指摘(docs/reviews/prNN-roundK.md)を直すとき、PR に main を取り込むときに使う。
 ---
 
 # タスク仕様を実装する
@@ -9,7 +9,7 @@ AGENTS.md の規則(完了の定義・コードの約束・Git の約束)が前�
 
 ## 1. 読む
 
-- 仕様: Issue なら `gh issue view NN`、PR コメントなら `gh pr view NN --comments`(いちばん新しい `## [codex] タスク仕様`)。
+- 仕様: Issue なら `gh issue view NN`、PR コメントなら `gh pr view NN --comments`(いちばん新しい `## [impl] タスク仕様`)。
 - 仕様が指す ADR の節と、その ADR の `*-opus-review-round*.md`。修正のときは `docs/reviews/prNN-roundK.md` の指摘。
 - 触るコードと、その周りのテスト(`test/` で関数名を grep する)。`AGENTS.md` の権利の約束と golden のルール。
 
@@ -17,7 +17,7 @@ AGENTS.md の規則(完了の定義・コードの約束・Git の約束)が前�
 
 ## 2. ブランチ
 
-- いまの checkout が仕様のブランチになっている(`git branch --show-current` で確かめる)。違えば止める。別の clone や worktree は作らない。
+- 作業は、自分で作ったスクラッチの clone の中で、仕様のブランチに切り替えて行う(`git branch --show-current` で確かめる)。共有の checkout や他の worktree・clone は触らない。
 - 既存 PR のブランチなら、始める前に `git pull --no-rebase origin <branch>`。
 - main の取り込み: `git merge origin/main`。手で衝突を解いたら、マージコミットのメッセージに「どのファイルを、どう解いたか」を書く。
   `goldens/` の衝突は、両方の変更を取り込んだ上で `pnpm golden:write` で作り直す。
@@ -34,7 +34,7 @@ AGENTS.md の規則(完了の定義・コードの約束・Git の約束)が前�
 ## 4. コミットと PR
 
 - 小さなコミットに分ける。メッセージは日本語、`feat(area): …(ADR NNNN U1)`。指摘を直すコミットには指摘 ID。
-  末尾に `Co-Authored-By: Codex <noreply@openai.com>`。
+  末尾に、使っているモデルの `Co-Authored-By:`(例: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`)。
 - push: 新しいブランチは `git push -u origin <branch>`、既存は `git push origin <branch>`。force-push しない。
 - PR: 新しければ `gh pr create --base <仕様のブランチの元。積み上げなら下のブランチ、ほかは main> --title … --body-file …`、既存なら本文を `gh pr edit` で更新。
   本文: 目的と ADR の節、変更の要点、テスト、変異(変えた所 → 落ちたテスト)、golden、指摘 → 修正の表(修正のとき)、Open questions。
