@@ -33,6 +33,12 @@ def read_truth_files(fixtures):
 def checked_fixtures(fixtures, model, cases):
     inputs = []
     current = calibration.generated_files()
+    for file_name, expected in current.items():
+        path = fixtures / file_name
+        if not path.is_file():
+            raise ValueError(f"fixture file is missing: {file_name}; generate the fixtures again")
+        if path.read_bytes() != expected:
+            raise ValueError(f"fixture is not what the current generator writes: {file_name}; generate the fixtures again")
     for name in cases:
         svg = fixtures / f"{name}.svg"
         truth_path = svg.with_suffix(".truth.json")

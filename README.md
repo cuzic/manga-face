@@ -73,7 +73,7 @@ python3 tools/fit/landmark_calibration.py generate out/landmark-fixtures
 node tools/fit/render_landmark_fixtures.ts out/landmark-fixtures
 ```
 
-`run_landmark_calibration.py --fixtures <directory> --model <model-version> --output <report.json> --adapter <command>` は、校正画像を各 2 回読み取り、正解座標を使って誤差と欠測を集計する。実行モデルには画像とランドマークの定義を渡す。既定は中立・平行移動・拡大と遮蔽の 3 枚。`--expanded` を指定すると笑顔・怒りと左右の遮蔽ケースが加わる。校正の前に、`--fixtures` の SVG と正解が、いまの `landmark_calibration.py generate` の出力とバイト単位で一致することを確かめる(古い・改変した画像のディレクトリは、呼び出し前に断る)。
+`run_landmark_calibration.py --fixtures <directory> --model <model-version> --output <report.json> --adapter <command>` は、校正画像を各 2 回読み取り、正解座標を使って誤差と欠測を集計する。実行モデルには画像とランドマークの定義を渡す。既定は中立・平行移動・拡大と遮蔽の 3 枚。`--expanded` を指定すると笑顔・怒りと左右の遮蔽ケースが加わる。校正の前に、`--fixtures` の SVG と正解が、いまの `landmark_calibration.py generate` の出力とバイト単位で一致することを確かめる(読む画像が基本の 3 件だけでも、現在の generate が作る SVG と正解のすべてを調べる。古い・改変した・欠けたファイルのあるディレクトリは、呼び出し前に断る)。
 
 `landmark_inference.py <sheet.png> <prepared-manifest.json> <output-directory> --model <model-version> [--record <reviewed.json>] --adapter <command>` は、R2/R3 の採用記録と前処理マニフェストに紐づく座標候補を出力する。`--record` は R2/R3 で確定した来歴記録(`fit.py` の `--record` と同じ。省略時は `<sheet>.provenance.json`)。マニフェストの `record_sha256` と一致しなければ、呼び出し前に断る。シート、来歴、出力は非公開の作業場所に置く。`--adapter` 以降には、標準入力と標準出力を使うアダプターの実行コマンドを指定する。OpenAI 用アダプターは `python3 tools/fit/openai_landmark_adapter.py`。環境変数 `OPENAI_API_KEY` を使い、実 API の試験は予算承認後に行う。
 

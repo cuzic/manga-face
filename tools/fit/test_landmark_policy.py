@@ -284,6 +284,25 @@ class StaleFixtureTest(unittest.TestCase):
             run_landmark_calibration.evaluate(root, "model", ["mock"], root / "checkpoint")
         self.assertEqual(calls, [])
 
+    def test_any_generated_file_stale_or_missing_is_refused_before_any_call(self):
+        import run_landmark_calibration
+
+        self.assertIn("smile.truth.json", landmark_calibration.generated_files())
+        self.assertNotIn("smile", landmark_calibration.BASE_CASES)
+        for change, pattern in (("altered", "current generator"), ("deleted", "missing")):
+            for name in ("smile.truth.json", "angry.svg"):
+                with self.subTest(change=change, name=name):
+                    root = self.make_fixtures()
+                    target = root / name
+                    if change == "altered":
+                        target.write_bytes(target.read_bytes() + b" ")
+                    else:
+                        target.unlink()
+                    patched, calls = self.adapter()
+                    with patched, self.assertRaisesRegex(ValueError, pattern):
+                        run_landmark_calibration.evaluate(root, "model", ["mock"], root / "checkpoint")
+                    self.assertEqual(calls, [])
+
     def test_truth_digest_describes_the_files_that_were_read(self):
         import run_landmark_calibration
 
