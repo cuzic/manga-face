@@ -95,7 +95,11 @@ def evaluate(fixtures, model, adapter, checkpoint, cases=calibration.BASE_CASES)
                 "sent_configuration_sha256": response.get("sent_configuration_sha256"),
             })
     return {
-        "model_version": model, "readings": scores,
+        "model_version": model,
+        "fixture_set": {"truth_sha256": calibration.fixture_truth_digest(),
+                        "raster_sha256": calibration.raster_digest(
+                            {name: raster["png_sha256"] for name, _, raster, _, _ in inputs})},
+        "readings": scores,
         "usage_summary": summarize_usage(scores),
         "invalid_responses": sum(reading["error"] is not None for reading in scores),
         "landmark_summary": calibration.summarize([reading["metrics"] for reading in scores]),

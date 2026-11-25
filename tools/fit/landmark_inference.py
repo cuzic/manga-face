@@ -64,6 +64,8 @@ def check_response(response, names, size, model):
     if not isinstance(inference_id, str) or not inference_id.strip():
         raise ValueError("adapter did not return an inference ID")
     points, missing = response["points"], response["missing"]
+    if not isinstance(points, dict) or not isinstance(missing, dict):
+        raise ValueError("adapter must return points and missing as objects")
     if points.keys() & missing.keys() or points.keys() | missing.keys() != names:
         raise ValueError("response must mark each requested landmark exactly once")
     width, height = size
@@ -109,9 +111,9 @@ def checked_cells(record, prepared):
     return prepared["cells"]
 
 
-def run(image_path, manifest_path, destination, model, adapter):
+def run(image_path, manifest_path, destination, model, adapter, record_path=None):
     prepared = json.loads(manifest_path.read_text())
-    record_bytes = image_path.with_suffix(".provenance.json").read_bytes()
+    record_bytes = (record_path or image_path.with_suffix(".provenance.json")).read_bytes()
     image_bytes = image_path.read_bytes()
     if (hashlib.sha256(image_bytes).hexdigest() != prepared["image_sha256"]
             or hashlib.sha256(record_bytes).hexdigest() != prepared["record_sha256"]):
@@ -170,12 +172,13 @@ if __name__ == "__main__":
     parser.add_argument("manifest", type=Path)
     parser.add_argument("destination", type=Path)
     parser.add_argument("--model", required=True)
+    parser.add_argument("--record", type=Path, help="reviewed provenance record (default: <image>.provenance.json)")
     parser.add_argument("--adapter", required=True, nargs=argparse.REMAINDER)
     args = parser.parse_args()
     try:
         if not args.adapter:
             raise ValueError("provide an adapter command after --adapter")
-        run(args.image, args.manifest, args.destination, args.model, args.adapter)
+        run(args.image, args.manifest, args.destination, args.model, args.adapter, args.record)
     except subprocess.CalledProcessError as error:
         parser.exit(2, f"Vision adapter exited with status {error.returncode}\n")
     except (OSError, KeyError, TypeError, ValueError, subprocess.TimeoutExpired) as error:

@@ -107,6 +107,24 @@ def score(truth, prediction):
     }
 
 
+def fixture_truth_digest():
+    """Digest of the fixtures `generate` writes now (SVG and truth bytes of every case)."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="r4-fixtures-") as directory:
+        root = Path(directory)
+        generate(root)
+        return hashlib.sha256(json.dumps({
+            path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in sorted(root.iterdir()) if path.suffix == ".svg" or path.name.endswith(".truth.json")
+        }, sort_keys=True).encode()).hexdigest()
+
+
+def raster_digest(rasters):
+    """Digest of {fixture name: PNG SHA-256}."""
+    return hashlib.sha256(json.dumps(dict(rasters), sort_keys=True).encode()).hexdigest()
+
+
 def summarize(scores):
     """Aggregate accuracy without counting an occlusion as a missed visible point."""
     summary = {}

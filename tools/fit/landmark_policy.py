@@ -1,18 +1,25 @@
 """Apply the R4 calibration and zoom checks before a reference fit."""
 import math
 
-from landmark_calibration import summarize
+from landmark_calibration import fixture_truth_digest, raster_digest, summarize
 from vision_checkpoint import digest
 
 OCCLUSION_REQUIRED = {"cheekL", "cheekR", "earL", "earR", "eyeL_outer", "eyeR_outer", "browL", "browR"}
 LIMITS = {"min_visible": 2, "min_detection": 0.9, "max_rms_px": 2, "max_zoom_px": 3, "min_occluded": 2}
 # Increment logic when changing the rules independently of their numeric limits.
-POLICY_VERSION = digest({"logic": 3, "limits": LIMITS, "occlusion_required": sorted(OCCLUSION_REQUIRED)})
+POLICY_VERSION = digest({"logic": 4, "limits": LIMITS, "occlusion_required": sorted(OCCLUSION_REQUIRED)})
 
 
 def qualified_points(first, second, zoom, report):
     if report.get("invalid_responses") != 0:
         raise ValueError("fit needs a calibration report without invalid responses")
+    fixture_set = report.get("fixture_set") or {}
+    rasters = {}
+    for reading in report["readings"]:
+        rasters.setdefault(reading.get("fixture"), reading.get("png_sha256"))
+    if (fixture_set.get("truth_sha256") != fixture_truth_digest()
+            or fixture_set.get("raster_sha256") != raster_digest(rasters)):
+        raise ValueError("calibration report was made for a different fixture set; calibrate again")
     model = first["model_version"]
     configuration = first["sent_configuration_sha256"]
     if (len(configuration) != 64 or report["model_version"] != model

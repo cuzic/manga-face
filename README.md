@@ -75,9 +75,11 @@ node tools/fit/render_landmark_fixtures.ts out/landmark-fixtures
 
 `run_landmark_calibration.py --fixtures <directory> --model <model-version> --output <report.json> --adapter <command>` は、校正画像を各 2 回読み取り、正解座標を使って誤差と欠測を集計する。実行モデルには画像とランドマークの定義を渡す。既定は中立・平行移動・拡大と遮蔽の 3 枚。`--expanded` を指定すると笑顔・怒りと左右の遮蔽ケースが加わる。
 
-`landmark_inference.py <sheet.png> <prepared-manifest.json> <output-directory> --model <model-version> --adapter <command>` は、R2/R3 の採用記録と前処理マニフェストに紐づく座標候補を出力する。シート、来歴、出力は非公開の作業場所に置く。`--adapter` 以降には、標準入力と標準出力を使うアダプターの実行コマンドを指定する。OpenAI 用アダプターは `python3 tools/fit/openai_landmark_adapter.py`。環境変数 `OPENAI_API_KEY` を使い、実 API の試験は予算承認後に行う。
+`landmark_inference.py <sheet.png> <prepared-manifest.json> <output-directory> --model <model-version> [--record <reviewed.json>] --adapter <command>` は、R2/R3 の採用記録と前処理マニフェストに紐づく座標候補を出力する。`--record` は R2/R3 で確定した来歴記録(`fit.py` の `--record` と同じ。省略時は `<sheet>.provenance.json`)。マニフェストの `record_sha256` と一致しなければ、呼び出し前に断る。シート、来歴、出力は非公開の作業場所に置く。`--adapter` 以降には、標準入力と標準出力を使うアダプターの実行コマンドを指定する。OpenAI 用アダプターは `python3 tools/fit/openai_landmark_adapter.py`。環境変数 `OPENAI_API_KEY` を使い、実 API の試験は予算承認後に行う。
 
-AI 参考の当てはめには校正レポートを `--calibration`、同じマスの拡大読取りを `--zoom` で渡す。推論ランナーは各マスの独立した 2 回と拡大画像 1 回の読取りを出力する。
+`landmark_repeatability.py <sessions.json>` は、5 枚の中立マスについて、同じ設定での 2 回の読取りから点ごとの σ(顔幅に対する %。ADR 0002 D8)を出す。`sessions.json` は 5 件の配列で、各件が `prepared_manifest` と `first`/`second`(読取りの `file`)を持つ。参照の重複・設定(モデルと設定の SHA-256)の混在・拡大の読取りは断る。
+
+AI 参考の当てはめには校正レポートを `--calibration`、同じマスの拡大読取りを `--zoom` で渡す。校正レポートには参考画像セット(正解と画像のハッシュ)の digest が記録され、いまのセットと違うレポートは当てはめで断る。推論ランナーは各マスの独立した 2 回と拡大画像 1 回の読取りを出力する。
 
 校正の `--expanded` では、笑顔・怒りに加えて左右の頬、耳、目尻、眉の遮蔽も検査する。同じ出力先に同じ条件で再実行すると保存済み応答を使う。失敗した応答や送信結果が不明な試行は同じ出力先から再送しない。応答 ID と利用量を調べ、再送が必要と確認できた場合に限り、該当のチェックポイント 1 件を監査用の別ディレクトリへ移してから、承認の範囲内で同じコマンドを実行する。校正レポートが既に出力されている場合は `--resume-invalid` を `--adapter` の前に付ける。無効な旧レポートは自動で退避される。他の成功済みチェックポイントはそのまま使う。
 

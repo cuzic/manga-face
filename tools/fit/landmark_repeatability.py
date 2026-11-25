@@ -5,7 +5,7 @@ The manifest is an array of five objects, each with `prepared_manifest` and
 `first`/`second` objects with `file`. Optional `face_width_px` overrides the
 default mean width measured between the two cheek landmarks.
 Paths are relative to the manifest. Each point file identifies its model version,
-prompt SHA-256, and distinct inference ID.
+configuration SHA-256, and distinct inference ID.
 """
 import json
 import math
@@ -86,7 +86,7 @@ def measure(manifest):
             model, prompt = reading["model_version"], reading["sent_configuration_sha256"]
             inference_id = reading["inference_id"]
             if not isinstance(model, str) or not model.strip() or not re.fullmatch(r"[a-f0-9]{64}", prompt):
-                raise ValueError("expected a model version and prompt SHA-256")
+                raise ValueError("expected a model version and configuration SHA-256")
             if not isinstance(inference_id, str) or not inference_id.strip() or inference_id in inference_ids:
                 raise ValueError("each reading needs a distinct inference ID")
             inference_ids.add(inference_id)
@@ -112,7 +112,7 @@ def measure(manifest):
             difference_squared = math.dist(a["points"][name], b["points"][name]) ** 2 / 4
             samples[name].append((difference_squared, width))
     if len(configurations) != 1:
-        raise ValueError("all passes must use the same model version and prompt")
+        raise ValueError("all passes must use the same model version and configuration")
     if len(excluded) == len(sessions):
         raise ValueError("no reference has a usable face width")
     results = {}

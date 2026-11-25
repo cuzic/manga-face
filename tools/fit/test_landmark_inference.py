@@ -1,7 +1,9 @@
+import copy
 import hashlib
 from io import BytesIO, StringIO
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -79,6 +81,130 @@ class LandmarkInferenceTest(unittest.TestCase):
             landmark_inference.check_response(response, {"chin"}, [16, 16], "test")
         with self.assertRaisesRegex(ValueError, "exactly once"):
             landmark_inference.check_response(response, {"chin", "noseTip"}, [16, 16], "test")
+
+
+class ResponseChecksTest(unittest.TestCase):
+    def valid(self, **changes):
+        return {"model_version": "test", "inference_id": "call", "points": {"chin": [3, 4]},
+                "missing": {"noseTip": "hidden"}, **changes}
+
+    def test_rejects_each_malformed_response(self):
+        names = {"chin", "noseTip"}
+        self.assertEqual(landmark_inference.check_response(self.valid(), names, [16, 16], "test")[0], "call")
+        cases = {
+            "other model": ({"model_version": "other"}, "unexpected model"),
+            "blank inference ID": ({"inference_id": "  "}, "inference ID"),
+            "non-string inference ID": ({"inference_id": 7}, "inference ID"),
+            "blank reason": ({"missing": {"noseTip": " "}}, "needs a reason"),
+            "non-string reason": ({"missing": {"noseTip": None}}, "needs a reason"),
+            "points as a list": ({"points": [["chin", 3, 4]]}, "objects"),
+            "missing as a list": ({"missing": ["noseTip"]}, "objects"),
+            "points as null": ({"points": None}, "objects"),
+            "float coordinate": ({"points": {"chin": [3.0, 4]}}, "outside"),
+            "point on both lists": ({"missing": {"noseTip": "x", "chin": "x"}}, "exactly once"),
+        }
+        for name, (changes, message) in cases.items():
+            with self.subTest(name):
+                with self.assertRaisesRegex(ValueError, message):
+                    landmark_inference.check_response(self.valid(**changes), names, [16, 16], "test")
+
+
+class RunBindingTest(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        self.image = self.root / "sheet.png"
+        Image.new("RGB", (32, 32), "white").save(self.image)
+        self.record = self.root / "reviewed.json"
+        cell = {"position": 0, "expression": "neutral", "review": "accepted"}
+        self.record.write_text(json.dumps({"id": "synthetic", "kind": "ai-generated", "domain": "young",
+                                           "reviewer": "owner", "review": "accepted", "cells": [cell],
+                                           "sha256": hashlib.sha256(self.image.read_bytes()).hexdigest()}))
+        self.manifest = self.root / "manifest.json"
+        self.prepared = {"reference_id": "synthetic", "kind": "ai-generated", "domain": "young",
+                         "image_sha256": hashlib.sha256(self.image.read_bytes()).hexdigest(),
+                         "record_sha256": hashlib.sha256(self.record.read_bytes()).hexdigest(),
+                         "cell_size": [16, 16], "cells": [{**cell, "origin": [0, 0]}]}
+        self.manifest.write_text(json.dumps(self.prepared))
+        self.sizes = []
+
+    def adapter(self, **changes):
+        def call(command, *, input, **kwargs):
+            request = json.loads(input)
+            self.sizes.append(request["size"])
+            zoomed = request["size"] == [32, 32]
+            result = {"model_version": "test-v1", "inference_id": f"call-{len(self.sizes)}",
+                      "points": {"chin": [20, 30] if zoomed else [10, 15]},
+                      "missing": {name: "hidden" for name in landmark_inference.DEFINITIONS if name != "chin"}}
+            result.update(changes)
+            return subprocess.CompletedProcess(command, 0, json.dumps(result), "")
+        return patch("vision_checkpoint.subprocess.run", side_effect=call)
+
+    def run_tool(self, **kwargs):
+        destination = self.root / "readings"
+        landmark_inference.run(self.image, self.manifest, destination, "test-v1", [sys.executable],
+                               record_path=self.record, **kwargs)
+        return destination
+
+    def test_zoom_coordinates_are_halved_back_to_the_source_cell(self):
+        with self.adapter():
+            destination = self.run_tool()
+        self.assertEqual(self.sizes, [[16, 16], [16, 16], [32, 32]])
+        readings = {name: json.loads((destination / f"0-pass-{name}.json").read_text()) for name in ("1", "2", "zoom")}
+        self.assertEqual(readings["zoom"]["points"]["chin"], [10, 15])
+        self.assertEqual(readings["zoom"]["points"], readings["1"]["points"])
+        self.assertEqual(readings["zoom"]["source_size"], [32, 32])
+        self.assertEqual(readings["1"]["record_sha256"], self.prepared["record_sha256"])
+
+    def test_record_path_is_explicit_and_the_sibling_name_is_only_a_default(self):
+        with self.adapter():
+            with self.assertRaises(OSError):
+                landmark_inference.run(self.image, self.manifest, self.root / "default", "test-v1", [sys.executable])
+            self.record.rename(self.image.with_suffix(".provenance.json"))
+            landmark_inference.run(self.image, self.manifest, self.root / "default", "test-v1", [sys.executable])
+        self.assertTrue((self.root / "default" / "0-pass-1.json").exists())
+
+    def test_cli_accepts_record(self):
+        argv = ["landmark_inference.py", str(self.image), str(self.manifest), str(self.root / "cli"),
+                "--model", "test-v1", "--record", str(self.record), "--adapter", sys.executable]
+        import runpy
+        with self.adapter(), patch.object(sys, "argv", argv):
+            runpy.run_path(str(Path(landmark_inference.__file__)), run_name="__main__")
+        self.assertTrue((self.root / "cli" / "0-pass-zoom.json").exists())
+
+    def test_rejected_inputs_never_reach_the_adapter(self):
+        def record_hash(prepared):
+            prepared["record_sha256"] = "0" * 64
+
+        def image_hash(prepared):
+            prepared["image_sha256"] = "0" * 64
+
+        for name, change in {"record hash": record_hash, "image hash": image_hash}.items():
+            with self.subTest(name):
+                changed = copy.deepcopy(self.prepared)
+                change(changed)
+                self.manifest.write_text(json.dumps(changed))
+                with patch("vision_checkpoint.subprocess.run") as adapter:
+                    with self.assertRaisesRegex(ValueError, "differs from the prepared manifest"):
+                        self.run_tool()
+                    adapter.assert_not_called()
+
+    def test_bad_adapter_replies_are_refused(self):
+        cases = {
+            "other model": ({"model_version": "other"}, "unexpected model"),
+            "blank reason": ({"missing": {name: " " for name in landmark_inference.DEFINITIONS if name != "chin"}},
+                             "needs a reason"),
+            "reused inference ID": ({"inference_id": "same"}, "reused an inference ID"),
+        }
+        for name, (changes, message) in cases.items():
+            with self.subTest(name):
+                shutil.rmtree(self.root / "readings", ignore_errors=True)
+                shutil.rmtree(self.root / "readings.checkpoint", ignore_errors=True)
+                with self.adapter(**changes):
+                    with self.assertRaisesRegex(ValueError, message):
+                        self.run_tool()
+                self.assertFalse((self.root / "readings").exists())
 
 
 class OpenAiAdapterTest(unittest.TestCase):
@@ -205,24 +331,6 @@ class CheckpointAndPolicyTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "outcome unknown"):
                     read_or_attempt(root, "pass-2", {}, {}, ["mock"])
                 adapter.assert_called_once()
-
-    def test_calibration_and_zoom_filter_out_unsafe_points(self):
-        from landmark_policy import qualified_points
-
-        fields = dict(reference_id="id", image_sha256="image-hash", record_sha256="record-hash", image="sheet.png",
-                      size=[408, 408], source_size=[408, 408], position=0, origin=[0, 0], expression="neutral", model_version="model",
-                      sent_configuration_sha256="a" * 64)
-        points = {"chin": [100, 200], "noseTip": [100, 150], "browL": [80, 110]}
-        a = {**fields, "pass": 1, "inference_id": "a", "points": points}
-        b = {**fields, "pass": 2, "inference_id": "b", "points": points}
-        zoom = {**fields, "pass": "zoom", "inference_id": "c", "source_size": [816, 816], "points": {**points, "noseTip": [110, 150]}}
-        metrics = {"error_px": {"chin": 1, "noseTip": 1, "browL": 1}, "missed_visible": [],
-                   "false_positive_on_occluded": ["browL"]}
-        report = {"model_version": "model", "invalid_responses": 0, "readings": [
-            {"sent_configuration_sha256": "a" * 64, "size": [408, 408], "metrics": metrics},
-            {"sent_configuration_sha256": "a" * 64, "size": [408, 408], "metrics": metrics},
-        ]}
-        self.assertEqual(qualified_points(a, b, zoom, report), {"chin"})
 
     def test_neutral_and_expression_side_occlusions_exist_for_both_sides(self):
         with tempfile.TemporaryDirectory() as directory:
