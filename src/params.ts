@@ -9,10 +9,12 @@ export interface Base {
   brows: {thick: number; dy: number};
   mouth: {w: number; y: number};
   nose: 'none' | 'dot' | 'line';
-  hair: {template: 'short' | 'bob'; strands: number; parting: number; ahoge: 'none' | 'left' | 'right'; highlight: boolean; sideLen: number};
+  hair: {template: typeof HAIR_TEMPLATES[number]; strands: number; parting: number; ahoge: 'none' | 'left' | 'right'; highlight: boolean; sideLen: number};
 }
 export interface Character extends Base {id: string; name: string; palette: Palette; mirror?: boolean}
 /** [min, max, step] */
+export const HAIR_TEMPLATES = ['short', 'bob', 'long', 'wavy'] as const;
+
 export const RANGES = {
   'head.cheek': [74, 96, 2], 'head.chin': [90, 98, 1], 'head.jaw': [0, 1, 0.05], 'head.chinW': [0, 16, 2],
   'eyes.w': [18, 28, 1], 'eyes.h': [13, 26, 1], 'eyes.tilt': [-8, 10, 1], 'eyes.iris': [0.6, 1.2, 0.05], 'eyes.y': [14, 28, 1], 'eyes.gap': [36, 48, 1], 'eyes.lidW': [4.5, 7.5, 0.5],

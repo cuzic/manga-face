@@ -1,4 +1,6 @@
 {
+  "id": "commons-surprising-face-2022",
+  "regression_fixture": true,
   "file": "commons-surprising-face-2022.png",
   "sha1": "3bebdda5c58157885bc56a8cd7142c372be88cdd",
   "sha256": "f9dc702180a013cba30274059b1819da113c0eb03cbf3f135b804cb5dc68d2ab",

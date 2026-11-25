@@ -6,7 +6,7 @@ argument-hint: "<PR 番号>"
 
 # 収束した PR のマージ
 
-Claude(または owner)が行う。main の取り込みや衝突解消は自分でせず、Codex に戻す(`codex-task`)。
+Claude(または owner)が行う。main の取り込みや衝突解消は自分でせず、実装者に戻す(`impl-task`)。
 
 ## 前提(1 つでも欠けたら止める)
 
@@ -45,7 +45,7 @@ Claude(または owner)が行う。main の取り込みや衝突解消は自分�
 
    `n -ge 4` は今の CI のジョブ数(test の Node 22 と 24、golden、measure)。measure は必須ではない(`continue-on-error`)が、結果は pass が来るのを見る。ジョブを増減したらここも直す。
    checks が 0 件(push の直後)・取れない・pending・`UNKNOWN` は、どれも止まる側に倒れる。少し置いてやり直す。
-   CONFLICTING なら Codex に main の取り込みを頼み、手順 1 からやり直す。
+   CONFLICTING なら実装者に main の取り込みを頼み、手順 1 からやり直す。
    **main が動いていないかも見る**: CI はブランチを最後に push した時点の main と合わせて回っている。衝突が無くても、その後に main が
    同じ所を変えていれば、マージ後の main で golden が落ちうる。
 
@@ -55,7 +55,7 @@ Claude(または owner)が行う。main の取り込みや衝突解消は自分�
    mb=$(git merge-base origin/main "$SHA"); git diff --stat "$mb" origin/main -- . ':!docs' ':!*.md' | tail -3
    ```
 
-   何か出たら、Codex に main の取り込みを頼み(`codex-task`)、CI が回り直してから手順 1 からやり直す。
+   何か出たら、実装者に main の取り込みを頼み(`impl-task`)、CI が回り直してから手順 1 からやり直す。
    CI が PR と関係ない理由(flaky など)で落ちたら、マージせずに、その原因を直す PR を別に作る。
 3. **固定した head でマージする**:
 

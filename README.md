@@ -39,10 +39,50 @@ For each stage-size blind review, the organizer chooses a fresh unsigned 32-bit 
 
 When the organizer supplies the `BLIND_QUIZ_SEED` Actions secret, CI publishes `blind.html` in `blind-quiz`. Reviewers should download only `blind-quiz`. To score that quiz, the organizer generates the key locally from the same commit, the run's `measurements.json`, and the same seed.
 
-Work is done by agents from task specs (Issues titled `[codex] …`): see `AGENTS.md`.
+Work is done by agents from task specs (Issues titled `[impl] …`): see `AGENTS.md`.
 
 ## Licences
 
 - **Code: MIT** (`LICENSE`).
 - **The art that the code generates (the SVG, the manifests, the goldens): CC0-1.0** (public domain dedication). The manifests carry `license: {spdx: 'CC0-1.0', …}`.
 - All art is original geometry written as code. No generative-model output, no tracing, no reference-matched art; `PROVENANCE.md` records each part.
+
+## 参考用の表情シートを生成する
+
+ADR 0002 R1 の開発者用ツール。初回の本番生成は owner の予算承認後に実行する。
+
+- `python3 tools/fit/generate.py submit` で費用を確認し、承認後に `--yes` を付けて送信する。送信と取得は環境変数 `OPENAI_API_KEY` を使う。
+- 表示された ID を `python3 tools/fit/generate.py collect <batch-id>` に渡す。処理中は同じ ID で再実行できる。
+- PNG と確認前の来歴記録は `refs/ai/pending/<batch-id>/` に保存される。送信の成否が不明なときは、再送信の前にローカルの `submission-*` の記録と API ダッシュボードを確認する。
+
+## 参考画像の採否を記録する
+
+ADR 0002 R2 の開発者用ツール。Python の依存バージョンは `tools/fit/requirements.txt` を参照。
+
+- `python3 tools/fit/review_reference.py list refs/ai/pending` で未審査のシートを表示する。
+- `review_reference.py review <sheet.png> <draft.json> <reviewed.json> --id ai-0001 --reviewer owner --reviewed-at YYYY-MM-DD --decision accepted` で採用結果を記録する。判断が異なるマスは `--discard-cell 2:quality` のように指定する。シート全体を不採用にする場合は `--decision discarded --reason quality` を指定する。採用した画像と記録は非公開の置き場に保管する。
+- `reference_record.py <sheet.png> <reviewed.json> --public-row` は `PROVENANCE.md` に載せる公開用の行を生成する。`--for-fit` は中立の採否と採用マスのしきい値を追加で検査する。
+- 当てはめには `fit.py <pass1.json> <pass2.json> <outdir> --reference-image <sheet.png> --record <reviewed.json>` を使う。先に記録と座標の対応を検査し、当てはめ実行時は `fit.json` と `derived.json` に方向と来歴のハッシュを保存する。既存 PD の回帰確認は `--fixture` を付ける。数値評価の依存は ADR 0002 R5 を参照。
+
+### AI によるランドマーク計測
+
+ADR 0002 R4 の開発用ツール。次のコマンドで、座標が既知の校正用 SVG と 408 × 408 px の PNG を作る。Python の計測ツールには Pillow が必要。
+
+```sh
+python3 tools/fit/landmark_calibration.py generate out/landmark-fixtures
+node tools/fit/render_landmark_fixtures.ts out/landmark-fixtures
+```
+
+`run_landmark_calibration.py --fixtures <directory> --model <model-version> --output <report.json> --adapter <command>` は、校正画像を各 2 回読み取り、正解座標を使って誤差と欠測を集計する。実行モデルには画像とランドマークの定義を渡す。既定は中立・平行移動・拡大と遮蔽の 3 枚。`--expanded` を指定すると笑顔・怒りと左右の遮蔽ケースが加わる。校正の前に、`--fixtures` の SVG と正解が、いまの `landmark_calibration.py generate` の出力とバイト単位で一致することを確かめる(読む画像が基本の 3 件だけでも、現在の generate が作る SVG と正解のすべてを調べる。古い・改変した・欠けたファイルのあるディレクトリは、呼び出し前に断る)。
+
+`landmark_inference.py <sheet.png> <prepared-manifest.json> <output-directory> --model <model-version> [--record <reviewed.json>] --adapter <command>` は、R2/R3 の採用記録と前処理マニフェストに紐づく座標候補を出力する。`--record` は R2/R3 で確定した来歴記録(`fit.py` の `--record` と同じ。省略時は `<sheet>.provenance.json`)。マニフェストの `record_sha256` と一致しなければ、呼び出し前に断る。シート、来歴、出力は非公開の作業場所に置く。`--adapter` 以降には、標準入力と標準出力を使うアダプターの実行コマンドを指定する。OpenAI 用アダプターは `python3 tools/fit/openai_landmark_adapter.py`。環境変数 `OPENAI_API_KEY` を使い、実 API の試験は予算承認後に行う。
+
+`landmark_repeatability.py <sessions.json>` は、5 枚の中立マスについて、同じ設定での 2 回の読取りから点ごとの σ(顔幅に対する %。ADR 0002 D8)を出す。`sessions.json` は 5 件の配列で、各件が `prepared_manifest` と `first`/`second`(読取りの `file`)を持つ。参照の重複・設定(モデルと設定の SHA-256)の混在・拡大の読取りは断る。
+
+AI 参考の当てはめには校正レポートを `--calibration`、同じマスの拡大読取りを `--zoom` で渡す。校正レポートには参考画像セット(正解と画像のハッシュ)の digest が記録され、いまのセットと違うレポートは当てはめで断る。推論ランナーは各マスの独立した 2 回と拡大画像 1 回の読取りを出力する。
+
+校正の `--expanded` では、笑顔・怒りに加えて左右の頬、耳、目尻、眉の遮蔽も検査する。同じ出力先に同じ条件で再実行すると保存済み応答を使う。失敗した応答や送信結果が不明な試行は同じ出力先から再送しない。応答 ID と利用量を調べ、再送が必要と確認できた場合に限り、該当のチェックポイント 1 件を監査用の別ディレクトリへ移してから、承認の範囲内で同じコマンドを実行する。校正レポートが既に出力されている場合は `--resume-invalid` を `--adapter` の前に付ける。無効な旧レポートは自動で退避される。他の成功済みチェックポイントはそのまま使う。
+
+## 採用シートを計測用に前処理する
+
+`python3 tools/fit/vectorize.py <sheet.png> <output-directory> --sheet-record <reviewed.json>` で、採用マスの墨マスクと輪郭を出力する。しきい値は来歴に記録した値を使う。生成した `manifest.json` にはマスの原点、画像・来歴の SHA-256、マスクと輪郭の SHA-256 を記録する。画像と前処理の出力は非公開の作業場所に保管する。

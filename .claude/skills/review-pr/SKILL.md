@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: manga-face の PR(Codex の実装)または ADR を敵対的にレビューし、docs/reviews/prNN-roundK.md(ADR は docs/adr/NNNN-opus-review-roundK.md)を PR ブランチにコミットする。PR のレビュー、レビューのラウンド、収束の判定を頼まれたとき、codex-task の報告が done になったときに使う。
+description: manga-face の PR(実装者の Sonnet の実装)または ADR を敵対的にレビューし、docs/reviews/prNN-roundK.md(ADR は docs/adr/NNNN-opus-review-roundK.md)を PR ブランチにコミットする。PR のレビュー、レビューのラウンド、収束の判定を頼まれたとき、impl-task の報告が done になったときに使う。
 argument-hint: "<PR 番号> <ラウンド K>"
 ---
 
@@ -8,7 +8,7 @@ argument-hint: "<PR 番号> <ラウンド K>"
 
 目的は **Blocker と Major を見つけること**。体裁や好みの指摘を増やすことではない。
 Claude 本体はレビューしない。**Opus のサブエージェント(Agent ツール、`model: opus`)に、下の「レビュアーへの指示」を渡す。**
-著者(Codex)と別の目で見るため、本体の結論や推測は渡さない(PR 番号・ラウンド・前ラウンドのファイルだけ)。
+著者(実装者の Sonnet)と別の目で見るため、本体の結論や推測は渡さない(PR 番号・ラウンド・前ラウンドのファイルだけ)。
 
 ## レビュアーへの指示(そのまま渡す)
 
@@ -72,5 +72,5 @@ push が拒否されたら `git pull --no-rebase origin <branch>` してから p
 
 ## レビューのあと(Claude 本体)
 
-- converged: no → 指摘 ID を挙げた修正の仕様を PR コメントに書き、`codex-task` で Codex に渡す。直ったら次のラウンド。
-- converged: yes で Minor/nit が残る → 直すなら同じく Codex に渡す(再レビューは要らず、CI 通過で可)。そのあと `merge-pr`。
+- converged: no → 指摘 ID を挙げた修正の仕様を PR コメントに書き、`impl-task` で実装者に渡す。直ったら次のラウンド。
+- converged: yes で Minor/nit が残る → 直すなら同じく実装者に渡す(再レビューは要らず、CI 通過で可)。そのあと `merge-pr`。

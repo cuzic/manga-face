@@ -13,7 +13,7 @@ test('seeds 0 through 99 match the generator 3 snapshots', () => {
   }
 });
 
-test('the three reference manifests have the expected SHA-256 hashes after the U2 rendering changes', () => {
+test('the three reference manifests have the expected SHA-256 hashes after the U3 rendering changes', () => {
   for (const [key, character] of Object.entries(CHARACTERS)) {
     const digest = createHash('sha256').update(JSON.stringify(toManifest(character))).digest('hex');
     assert.equal(digest, baseline.manifests[key], key);

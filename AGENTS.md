@@ -1,4 +1,4 @@
-# manga-face — エージェント共通ガイド(Codex・Claude 共通)
+# manga-face — エージェント共通ガイド(実装者・Claude 共通)
 
 パラメトリックなマンガ風の顔を SVG で出す TypeScript のライブラリ。出力は svg-diagram の `CharacterManifest`(`comic()` がそのまま受ける)。
 設計は `docs/adr/` にある(最初の ADR は `0001-manga-face.md`)。作業の前に、担当する ADR の節と、その `*-opus-review-round*.md` を読む。
@@ -8,18 +8,19 @@
 
 | 担当 | 仕事 |
 | --- | --- |
-| Claude | ADR の設計と試し(spike)、owner への質問の整理、タスク仕様を書く、PR の敵対的レビュー、マージ |
-| Codex | 実装してよい状態の ADR に沿った実装、レビュー指摘の修正、main の取り込みと衝突解消、テストの追加 |
+| Claude(Opus) | ADR の設計と試し(spike)、owner への質問の整理、タスク仕様を書く、PR の敵対的レビュー、マージ |
+| 実装者(Claude Sonnet のサブエージェント) | 実装してよい状態の ADR に沿った実装、レビュー指摘の修正、main の取り込みと衝突解消、テストの追加 |
 | owner | 見た目の好み(目標の方向、確認点での承認)、権利の判断、ライセンス。**見た目の良し悪しは owner が決める。機械の検査は「壊れていない」まで** |
 | CI | typecheck・lint・テスト(Node 22 と 24)・golden の再生成の一致 |
 
 - 仕事は「タスク仕様」(目的・根拠・スコープ・触ってよいファイル・受け入れ条件)で渡す。
-  新しい作業は `[codex] …` の Issue、既存 PR への修正や main の取り込みはその PR の `## [codex] タスク仕様` コメント。
+  新しい作業は `[impl] …` の Issue、既存 PR への修正や main の取り込みはその PR の `## [impl] タスク仕様` コメント。
+  渡し方は `.claude/skills/impl-task`(Agent ツールで `model: sonnet` のサブエージェントを起こす)。
 - レビュー指摘の根拠は、PR ブランチにコミットされた `docs/reviews/prNN-roundK.md`(ADR は `docs/adr/NNNN-opus-review-roundK.md`)。
 - **仕様に無い判断が要るときは、実装で決めない。** PR 本文の「Open questions」に書いて、そこで止める。
 - **owner の確認点(ADR 0001 D7)の前に、次の単位へ進まない。** 特に U3 は、U2 の舞台の大きさのギャラリーを owner が承認してから。
-- Codex は `run-codex.sh`(`.claude/skills/codex-task/scripts/`)が作った clone の中で、仕様のブランチに切り替わった状態で始まる。
-  別の clone や worktree は作らない。
+- 実装者は、スクラッチ領域に自分で作った clone(`impl-task` の手順)の中で、仕様のブランチに切り替えて作業する。
+  共有の checkout や他の worktree・clone は触らない。
 
 ## 完了の定義(どの PR も)
 
@@ -68,7 +69,7 @@ pnpm golden                                 # goldens/*.svg が再生成と 1 �
 
 - 試しのファイルや一時ファイルはリポジトリの外に置く。コミットに残さない。`out/` は生成物(コミットしない)。
 - コミット・コメント・PR に、マシン固有の情報(ユーザー名・絶対パス・トークン)を書かない。
-- `.codex/` と `.pnpmfile.cjs` をコミットしない(Codex の実行スクリプトが、それらを持つブランチを断る)。
+- `.codex/` と `.pnpmfile.cjs` をコミットしない(後でそのブランチで pnpm やエージェントを走らせる人の手元で動くため)。
 - **このリポジトリは公開**。例の文言は中立なもの(「ここが変更点です。」「要確認ですね。」)だけ。実在の会社・製品・計画・個人の語を書かない。**ただし、`PROVENANCE.md` と ADR 0002 D2 が求める出所の記録(作者・アップロード者の名前、出典の URL)は書く(外さない・断らない)**。
 
 ## Git の約束
@@ -80,7 +81,7 @@ pnpm golden                                 # goldens/*.svg が再生成と 1 �
 - コミットメッセージは日本語または英語で `feat(area): …` / `fix(area): …`。ADR の段階があれば `(ADR 0001 U1)` のように書く。
   レビュー指摘を直すコミットには指摘 ID(`M1` `m2` など)を書く。
 - コミット末尾に、使っているツールの `Co-Authored-By:` トレーラーを付ける。
-- **Codex は PR を作って更新するが、マージしない。** マージは Claude が `.claude/skills/merge-pr` の手順で行う(owner でもよい)。
+- **実装者は PR を作って更新するが、マージしない。** マージは Claude が `.claude/skills/merge-pr` の手順で行う(owner でもよい)。
 - PR 本文: 何を・なぜ(ADR と節)、テスト、当てた変異、指摘 → 修正の表(修正のとき)、Open questions。
 - `main` には ruleset(force-push と削除の禁止、PR 必須、CI の必須)が掛かっている。直接 push しない。
 

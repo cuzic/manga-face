@@ -3,7 +3,7 @@ import {faceFragmentRaw} from './fragment.ts';
 import {CX, CY, HEAD_R, faceHalfWidth, faceSegs, flatten, n, selfIntersects} from './geometry.ts';
 import {hairParts} from './hair.ts';
 import {HAIR, HEX, IRIS, SKIN, TOP} from './palette.ts';
-import {RANGES, get, normalizeWithRanges} from './params.ts';
+import {HAIR_TEMPLATES, RANGES, get, normalizeWithRanges} from './params.ts';
 import type {Character, ParameterRanges, RangeKey} from './params.ts';
 import {DIRECTIONS} from './styles.ts';
 
@@ -55,6 +55,10 @@ export function validateRaw(ch: Character, expressions: readonly string[] = ADR0
   if (selfIntersects(face)) out.push({group: 'head', code: 'face-self-intersect', message: 'the face outline crosses itself'});
   if (Math.max(...face.filter(p => p[1] > CY - 20).map(p => Math.sqrt((p[0] - CX) * (p[0] - CX) + (p[1] - CY) * (p[1] - CY)))) > HEAD_R + 0.5) {
     out.push({group: 'head', code: 'head-circle', message: 'the chin or cheek leaves the head circle'});
+  }
+  if (!HAIR_TEMPLATES.includes(ch.hair.template)) {
+    out.push({group: 'hair', code: 'hair-template', message: 'hair.template must be short, bob, long, or wavy'});
+    return out;
   }
   const hp = hairParts(ch.hair, ch.head.cheek, '#000000').polys;
   for (const [part, poly] of Object.entries(hp)) {

@@ -24,6 +24,15 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      - if: matrix.node == 22
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - if: matrix.node == 22
+        run: |
+          python3 -m venv "$RUNNER_TEMP/manga-face-fit"
+          "$RUNNER_TEMP/manga-face-fit/bin/python" -m pip install numpy==2.5.5 pillow==13.0.0 potracer==0.0.4 jsonschema==4.26.0
+          "$RUNNER_TEMP/manga-face-fit/bin/python" -m unittest discover -s tools/fit -p 'test_*.py'
   # The goldens (goldens/*.svg) are rebuilt and compared byte for byte. Faces have no text, so no fonts are involved: plain SVG is the same on every machine.
   # The whole gallery is rendered too and kept as an artifact, so a reviewer can look at it.
   golden:
