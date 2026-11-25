@@ -4,15 +4,15 @@ import {CHARACTERS, GENERATOR, RANGES, randomCharacter, validate} from '../src/i
 import {repairCharacter} from '../src/random.ts';
 import {validateWithRanges} from '../src/validate.ts';
 
-test('generator 3 can repair only the brows without changing other groups', () => {
-  assert.equal(GENERATOR, 3);
+test('generator 4 can repair only the brows without changing other groups', () => {
+  assert.equal(GENERATOR, 4);
   const base = CHARACTERS.a;
   const candidate = {...base, eyes: {...base.eyes, h: 13, tilt: 5}, brows: {thick: 7, dy: 3}};
-  const drawn = repairCharacter(candidate, '0');
+  const drawn = repairCharacter(candidate, '1');
   assert.equal(drawn.firstDrawValid, false);
   assert.deepEqual(drawn.repaired, ['brows']);
   assert.deepEqual(validate(drawn.character), []);
-  assert.deepEqual(drawn.character, {...candidate, brows: {thick: 6.5, dy: -3}});
+  assert.deepEqual(drawn.character, {...candidate, brows: {thick: 4.5, dy: 1}});
 });
 
 test('all 5,000 sampled seeds produce valid characters', () => {
@@ -24,7 +24,7 @@ test('all 5,000 sampled seeds produce valid characters', () => {
 test('repair uses the default brows after all four redraws fail', () => {
   const base = CHARACTERS.a;
   const candidate = {...base, eyes: {...base.eyes, h: 13, tilt: 5}, brows: {thick: 7, dy: 3}};
-  const drawn = repairCharacter(candidate, '159');
+  const drawn = repairCharacter(candidate, '88');
   assert.equal(drawn.firstDrawValid, false);
   assert.deepEqual(drawn.repaired, ['brows', 'brows', 'brows', 'brows', 'brows']);
   assert.deepEqual(drawn.character, {...candidate, brows: base.brows});
@@ -40,10 +40,10 @@ test('repair throws when the character is still invalid after the fallback', () 
 test('repair uses the default hair after four self-intersecting redraws', () => {
   const base = CHARACTERS.a;
   const candidate = {...base, hair: {...base.hair, sideLen: 0}};
-  // For seed 296 all four redraws self-intersect (sideLen snaps below the default side length), so the default hair is restored.
+  // For seed 1117 all four redraws self-intersect (sideLen snaps below the default side length), so the default hair is restored.
   const ranges = {...RANGES, 'hair.sideLen': [0, 36, 64]} as const;
   assert.deepEqual(validateWithRanges(candidate, ranges).map(v => v.code), ['hair-self-intersect']);
-  const drawn = repairCharacter(candidate, '296', ranges);
+  const drawn = repairCharacter(candidate, '1117', ranges);
   assert.equal(drawn.firstDrawValid, false);
   assert.deepEqual(drawn.repaired, ['hair', 'hair', 'hair', 'hair', 'hair']);
   assert.deepEqual(drawn.character, base);
