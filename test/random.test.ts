@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {CHARACTERS, GENERATOR, RANGES, randomCharacter, validate} from '../src/index.ts';
+import {CHARACTERS, GENERATOR, RANGES, randomCharacterDetailed, validate} from '../src/index.ts';
 import {repairCharacter} from '../src/random.ts';
 import {validateWithRanges} from '../src/validate.ts';
 
@@ -15,10 +15,15 @@ test('generator 4 can repair only the brows without changing other groups', () =
   assert.deepEqual(drawn.character, {...candidate, brows: {thick: 4.5, dy: 1}});
 });
 
-test('all 5,000 sampled seeds produce valid characters', () => {
+test('all 5,000 sampled seeds produce valid characters, and at least 99% are valid before any repair (ADR 0001 U5)', () => {
+  let firstDrawValid = 0;
   for (let seed = 0; seed < 5_000; seed++) {
-    assert.deepEqual(validate(randomCharacter(seed)), [], `seed ${seed}`);
+    const drawn = randomCharacterDetailed(seed);
+    assert.deepEqual(validate(drawn.character), [], `seed ${seed}`);
+    assert.equal(drawn.firstDrawValid, drawn.repaired.length === 0, `seed ${seed}`);
+    if (drawn.firstDrawValid) firstDrawValid++;
   }
+  assert.ok(firstDrawValid / 5_000 >= 0.99, `first-draw validity ${firstDrawValid / 5_000}`);
 });
 
 test('repair uses the default brows after all four redraws fail', () => {
@@ -48,4 +53,33 @@ test('repair uses the default hair after four self-intersecting redraws', () => 
   assert.deepEqual(drawn.repaired, ['hair', 'hair', 'hair', 'hair', 'hair']);
   assert.deepEqual(drawn.character, base);
   assert.deepEqual(validate(drawn.character), []);
+});
+
+// The `ranges` argument must reach every step of repairCharacter. Each test below fails if one step uses the default RANGES instead.
+test('repair redraws a group with the supplied ranges', () => {
+  const base = CHARACTERS.a;
+  const candidate = {...base, eyes: {...base.eyes, h: 13, tilt: 5}, brows: {thick: 7, dy: 3}};
+  // Fine steps: a redraw snapped by RANGES (step 0.5 / 1) and re-snapped by these ranges gives a different dy than a redraw snapped by these ranges directly.
+  const ranges = {...RANGES, 'brows.thick': [4, 9, 0.3], 'brows.dy': [-20, 8, 0.3]} as const;
+  const drawn = repairCharacter(candidate, '1', ranges);
+  assert.deepEqual(drawn.repaired, ['brows']);
+  assert.deepEqual(drawn.character.brows, {thick: 4.5, dy: 1.5});
+});
+
+test('repair normalizes the fallback with the supplied ranges', () => {
+  const base = CHARACTERS.a;
+  const candidate = {...base, hair: {...base.hair, sideLen: 0}};
+  // hair.parting step 0.4 snaps the default parting 0.5 to 0.4; the default RANGES would keep 0.5.
+  const ranges = {...RANGES, 'hair.sideLen': [0, 36, 64], 'hair.parting': [-1, 1, 0.4]} as const;
+  const drawn = repairCharacter(candidate, '1117', ranges);
+  assert.deepEqual(drawn.repaired, ['hair', 'hair', 'hair', 'hair', 'hair']);
+  assert.deepEqual(drawn.character, {...base, hair: {...base.hair, sideLen: 36, parting: 0.4}});
+});
+
+test('repair runs the final validation with the supplied ranges', () => {
+  const base = CHARACTERS.a;
+  const candidate = {...base, hair: {...base.hair, sideLen: 0}};
+  // sideLen is pinned to 0, so even the default hair crosses itself; validating with RANGES would report a range error instead.
+  const ranges = {...RANGES, 'hair.sideLen': [0, 0, 64]} as const;
+  assert.throws(() => repairCharacter(candidate, '1117', ranges), (e: Error) => /hair mass crosses itself/.test(e.message) && !/outside/.test(e.message));
 });
