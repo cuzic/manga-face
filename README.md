@@ -39,7 +39,7 @@ For each stage-size blind review, the organizer chooses a fresh unsigned 32-bit 
 
 When the organizer supplies the `BLIND_QUIZ_SEED` Actions secret, CI publishes `blind.html` in `blind-quiz`. Reviewers should download only `blind-quiz`. To score that quiz, the organizer generates the key locally from the same commit, the run's `measurements.json`, and the same seed.
 
-Work is done by agents from task specs (Issues titled `[codex] …`): see `AGENTS.md`.
+Work is done by agents from task specs (Issues titled `[impl] …`): see `AGENTS.md`.
 
 ## Licences
 
