@@ -8,7 +8,7 @@ usage: python tools/fit/fit.py <pass1.json> <pass2.json> <outdir> [expression] -
 - No crown landmark (the hair height belongs to the hair).
 - Deterministic: a coordinate descent on the parameter grid (the model snaps parameters to the steps of RANGES, so there is no gradient), from the young default.
 """
-import argparse, json, subprocess
+import argparse, hashlib, json, subprocess
 from pathlib import Path
 import numpy as np
 from jsonschema import ValidationError
@@ -58,8 +58,20 @@ def load_landmarks(a, b, names):
         raise ValueError("fitting needs at least two distinct landmarks visible in both readings")
     return P, sigma, present, a
 
-def main(p1, p2, outdir, expression=None, *, reference_image, record=None, fixture=False):
+def main(p1, p2, outdir, expression=None, *, reference_image, record=None, fixture=False, calibration=None, zoom=None):
     identity, a, b = fit_inputs(reference_image, record, (p1, p2), fixture)
+    if identity["kind"] == "ai-generated":
+        if calibration is None or zoom is None:
+            raise ValueError("AI reference fitting requires --calibration and --zoom")
+        from landmark_policy import POLICY_VERSION, qualified_points
+
+        calibration_data, zoom_data = calibration.read_bytes(), zoom.read_bytes()
+        allowed = qualified_points(a, b, json.loads(zoom_data), json.loads(calibration_data))
+        identity.update(calibration_sha256=hashlib.sha256(calibration_data).hexdigest(),
+                        zoom_sha256=hashlib.sha256(zoom_data).hexdigest(), landmark_policy=POLICY_VERSION,
+                        excluded_by_policy=sorted(a["points"].keys() & b["points"].keys() - allowed))
+        a, b = ({**reading, "points": {name: point for name, point in reading["points"].items() if name in allowed}}
+                for reading in (a, b))
     if expression is not None and expression != a["expression"]:
         raise ValueError("requested expression differs from the landmark readings")
     expression = a["expression"]
@@ -143,10 +155,13 @@ if __name__ == '__main__':
     parser.add_argument("--reference-image", required=True, type=Path)
     parser.add_argument("--record", type=Path)
     parser.add_argument("--fixture", action="store_true")
+    parser.add_argument("--calibration", type=Path)
+    parser.add_argument("--zoom", type=Path)
     args = parser.parse_args()
     try:
         main(args.first, args.second, args.outdir, args.expression,
-             reference_image=args.reference_image, record=args.record, fixture=args.fixture)
+             reference_image=args.reference_image, record=args.record, fixture=args.fixture,
+             calibration=args.calibration, zoom=args.zoom)
     except ValidationError as error:
         field = ".".join(str(part) for part in error.absolute_path) or "record"
         parser.exit(2, f"Schema validation failed at {field} ({error.validator})\n")
